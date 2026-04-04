@@ -3,6 +3,7 @@
 import { z } from 'zod'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { formString } from '@/lib/form/form-data'
 import { isValidPhoneCountryCode, parseLocalToE164 } from '@/lib/phone/vendor-countries'
 
 export type VendorSignupFieldKey =
@@ -24,22 +25,37 @@ const VendorSignupSchema = z.object({
   businessName: z
     .string()
     .transform((s) => s.trim())
-    .pipe(z.string().min(2, 'Business name must be at least 2 characters.').max(200)),
+    .refine((s) => s.length > 0, { message: 'Enter your business name.' })
+    .refine((s) => s.length >= 2, {
+      message: 'Business name must be at least 2 characters.',
+    })
+    .refine((s) => s.length <= 200, { message: 'Business name is too long.' }),
   email: z
     .string()
     .transform((s) => s.trim().toLowerCase())
-    .pipe(z.string().email('Enter a valid email address.')),
+    .pipe(
+      z
+        .string()
+        .min(1, 'Enter your email address.')
+        .email('Enter a valid email address.')
+    ),
   countryCode: z
     .string()
     .transform((s) => s.trim().toUpperCase())
     .refine((c) => isValidPhoneCountryCode(c), {
       message: 'Select a valid country.',
     }),
-  phoneLocal: z.string().min(1, 'Enter your phone number.'),
+  phoneLocal: z
+    .string()
+    .transform((s) => s.trim())
+    .refine((s) => s.length > 0, { message: 'Enter your phone number.' }),
   password: z
     .string()
-    .min(8, 'Password must be at least 8 characters.')
-    .max(128, 'Password is too long.'),
+    .refine((s) => s.length > 0, { message: 'Enter a password.' })
+    .refine((s) => s.length >= 8, {
+      message: 'Password must be at least 8 characters.',
+    })
+    .refine((s) => s.length <= 128, { message: 'Password is too long.' }),
 })
 
 function zodIssuesToFieldErrors(
@@ -77,11 +93,11 @@ export async function signUpVendorAction(
   formData: FormData
 ): Promise<VendorSignupState> {
   const parsed = VendorSignupSchema.safeParse({
-    businessName: formData.get('businessName'),
-    email: formData.get('email'),
-    countryCode: formData.get('countryCode'),
-    phoneLocal: formData.get('phoneLocal'),
-    password: formData.get('password'),
+    businessName: formString(formData, 'businessName'),
+    email: formString(formData, 'email'),
+    countryCode: formString(formData, 'countryCode'),
+    phoneLocal: formString(formData, 'phoneLocal'),
+    password: formString(formData, 'password'),
   })
 
   if (!parsed.success) {

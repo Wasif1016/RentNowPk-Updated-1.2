@@ -7,29 +7,59 @@ import { createClient } from '@/lib/supabase/server'
 import { db } from '@/lib/db'
 import { users } from '@/lib/db/schema'
 import { resolveRedirectAfterLogin, type AppRole } from '@/lib/auth/safe-next'
+import { formString } from '@/lib/form/form-data'
 
 const LoginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
+  email: z
+    .string()
+    .transform((s) => s.trim().toLowerCase())
+    .pipe(
+      z
+        .string()
+        .min(1, 'Enter your email address.')
+        .email('Enter a valid email address.')
+    ),
+  password: z.string().min(1, 'Enter your password.'),
 })
+
+export type LoginFieldKey = 'email' | 'password'
+
+export type LoginActionResult =
+  | { success: true; data: { redirectTo: string } }
+  | {
+      success: false
+      fieldErrors?: Partial<Record<LoginFieldKey, string>>
+      error?: string
+    }
+
+function loginZodToFieldErrors(
+  issues: z.core.$ZodIssue[]
+): Partial<Record<LoginFieldKey, string>> {
+  const fieldErrors: Partial<Record<LoginFieldKey, string>> = {}
+  for (const issue of issues) {
+    const key = issue.path[0]
+    if (key === 'email' || key === 'password') {
+      if (!fieldErrors[key]) fieldErrors[key] = issue.message
+    }
+  }
+  return fieldErrors
+}
 
 export type ActionResult<T = void> =
   | { success: true; data?: T }
   | { success: false; error: string }
 
-export async function loginAction(
-  formData: FormData
-): Promise<ActionResult<{ redirectTo: string }>> {
+export async function loginAction(formData: FormData): Promise<LoginActionResult> {
   const nextRaw = formData.get('next')
   const next = typeof nextRaw === 'string' ? nextRaw : null
 
   const parsed = LoginSchema.safeParse({
-    email: formData.get('email'),
-    password: formData.get('password'),
+    email: formString(formData, 'email'),
+    password: formString(formData, 'password'),
   })
 
   if (!parsed.success) {
-    return { success: false, error: 'Invalid email or password.' }
+    return { success: false, fieldErrors: loginZodToFieldErrors(parsed.error.issues) }
   }
 
   const supabase = await createClient()

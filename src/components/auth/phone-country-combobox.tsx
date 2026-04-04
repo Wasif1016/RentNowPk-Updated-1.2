@@ -55,7 +55,9 @@ export function PhoneCountryCombobox({
           aria-invalid={invalid}
           disabled={disabled}
           className={cn(
-            'h-9 min-w-38 shrink-0 justify-between gap-1 bg-card border-border px-3 font-normal',
+            'h-9 min-w-38 shrink-0 justify-between gap-1 bg-card px-3 font-normal',
+            !invalid && 'border-border',
+            invalid && 'border-destructive ring-[3px] ring-destructive/20 dark:border-destructive/50',
             className
           )}
         >

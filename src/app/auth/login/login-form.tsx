@@ -2,7 +2,8 @@
 
 import { useActionState, useEffect } from 'react'
 import Link from 'next/link'
-import { loginAction, type ActionResult } from '@/lib/actions/auth'
+import { loginAction, type LoginActionResult } from '@/lib/actions/auth'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -13,9 +14,15 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field'
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+  FieldError,
+} from '@/components/ui/field'
 
-type LoginState = ActionResult<{ redirectTo: string }> | null
+type LoginState = LoginActionResult | null
 
 async function loginFormAction(_prev: LoginState, formData: FormData): Promise<LoginState> {
   return loginAction(formData)
@@ -38,14 +45,16 @@ export function LoginForm({
   const [state, formAction, pending] = useActionState(loginFormAction, null)
 
   useEffect(() => {
-    if (state?.success && state.data?.redirectTo) {
+    if (state?.success && state.data.redirectTo) {
       window.location.assign(state.data.redirectTo)
     }
   }, [state])
 
   const urlError = errorCode ? errorMessages[errorCode] : null
-  const formError = state && !state.success ? state.error : null
-  const bannerError = urlError ?? formError
+  const fe =
+    state && !state.success ? (state.fieldErrors ?? {}) : {}
+  const authError = state && !state.success ? state.error : null
+  const bannerError = urlError ?? authError
 
   return (
     <Card>
@@ -53,7 +62,7 @@ export function LoginForm({
         <CardTitle>Log in</CardTitle>
         <CardDescription>Use your vendor email and password.</CardDescription>
       </CardHeader>
-      <form action={formAction}>
+      <form action={formAction} noValidate>
         <input type="hidden" name="next" value={nextPath} />
         <CardContent>
           <FieldGroup>
@@ -65,27 +74,31 @@ export function LoginForm({
                 {bannerError}
               </div>
             )}
-            <Field data-invalid={state && !state.success ? true : undefined}>
+            <Field data-invalid={fe.email ? true : undefined}>
               <FieldLabel htmlFor="email">Email</FieldLabel>
               <Input
                 id="email"
                 name="email"
                 type="email"
                 autoComplete="email"
-                required
-                aria-invalid={state && !state.success ? true : undefined}
+                aria-required
+                aria-invalid={fe.email ? true : undefined}
+                className={cn('bg-card', !fe.email && 'border-border')}
               />
+              {fe.email && <FieldError>{fe.email}</FieldError>}
             </Field>
-            <Field data-invalid={!!formError ? true : undefined}>
+            <Field data-invalid={fe.password ? true : undefined}>
               <FieldLabel htmlFor="password">Password</FieldLabel>
               <Input
                 id="password"
                 name="password"
                 type="password"
                 autoComplete="current-password"
-                required
-                aria-invalid={!!formError ? true : undefined}
+                aria-required
+                aria-invalid={fe.password ? true : undefined}
+                className={cn('bg-card', !fe.password && 'border-border')}
               />
+              {fe.password && <FieldError>{fe.password}</FieldError>}
             </Field>
             <FieldDescription>
               Pakistan WhatsApp format for signup: 03XXXXXXXXX or +92XXXXXXXXXX

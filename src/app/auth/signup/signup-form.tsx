@@ -26,6 +26,7 @@ import {
   FieldError,
 } from '@/components/ui/field'
 import { showToast } from '@/components/ui/toast'
+import { cn } from '@/lib/utils'
 
 async function signupFormAction(
   _prev: VendorSignupState | null,
@@ -107,7 +108,7 @@ export function SignupForm() {
           List your fleet on RentNowPk. You will verify your email before accessing the dashboard.
         </CardDescription>
       </CardHeader>
-      <form action={formAction}>
+      <form action={formAction} noValidate>
         <input type="hidden" name="countryCode" value={countryCode} />
         <CardContent>
           <FieldGroup>
@@ -118,10 +119,9 @@ export function SignupForm() {
                 name="businessName"
                 type="text"
                 autoComplete="organization"
-                required
-                minLength={2}
+                aria-required
                 aria-invalid={fe.businessName ? true : undefined}
-                className="bg-card border-border"
+                className={cn('bg-card', !fe.businessName && 'border-border')}
               />
               {fe.businessName && <FieldError>{fe.businessName}</FieldError>}
             </Field>
@@ -132,9 +132,9 @@ export function SignupForm() {
                 name="email"
                 type="email"
                 autoComplete="email"
-                required
+                aria-required
                 aria-invalid={fe.email ? true : undefined}
-                className="bg-card border-border"
+                className={cn('bg-card', !fe.email && 'border-border')}
               />
               {fe.email && <FieldError>{fe.email}</FieldError>}
             </Field>
@@ -158,9 +158,12 @@ export function SignupForm() {
                       ? 'e.g. 3147651112'
                       : 'National number only'
                   }
-                  required
+                  aria-required
                   aria-invalid={fe.phoneLocal ? true : undefined}
-                  className="min-w-0 flex-1 bg-card border-border"
+                  className={cn(
+                    'min-w-0 flex-1 bg-card',
+                    !fe.phoneLocal && 'border-border'
+                  )}
                 />
               </div>
               {fe.countryCode && <FieldError>{fe.countryCode}</FieldError>}
@@ -177,10 +180,9 @@ export function SignupForm() {
                 name="password"
                 type="password"
                 autoComplete="new-password"
-                required
-                minLength={8}
+                aria-required
                 aria-invalid={fe.password ? true : undefined}
-                className="bg-card border-border"
+                className={cn('bg-card', !fe.password && 'border-border')}
               />
               {fe.password && <FieldError>{fe.password}</FieldError>}
               <FieldDescription>At least 8 characters.</FieldDescription>
