@@ -18,20 +18,11 @@ export type PhoneCountryOption = {
   /** ISO 3166-1 alpha-2 (libphonenumber region) */
   code: string
   dial: string
-  flag: string
   label: string
 }
 
 /** Default region — platform focus Pakistan */
 export const DEFAULT_PHONE_COUNTRY = 'PK'
-
-const FLAG_OFFSET = 127397
-
-function flagEmoji(iso2: string): string {
-  const a = iso2.toUpperCase()
-  if (a.length !== 2) return ''
-  return [...a].map((c) => String.fromCodePoint(FLAG_OFFSET + c.codePointAt(0)!)).join('')
-}
 
 let cachedOptions: PhoneCountryOption[] | null = null
 let validCodes: ReadonlySet<string> | null = null
@@ -48,7 +39,6 @@ export function getPhoneCountryOptions(): PhoneCountryOption[] {
   const options: PhoneCountryOption[] = codes.map((code) => ({
     code,
     dial: getCountryCallingCode(code as CountryCode),
-    flag: flagEmoji(code),
     label: getName(code, 'en') ?? code,
   }))
 

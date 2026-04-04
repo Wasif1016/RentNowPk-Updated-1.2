@@ -13,6 +13,7 @@ import {
   CommandList,
 } from '@/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { CountryFlag } from '@/components/country-flag'
 import {
   DEFAULT_PHONE_COUNTRY,
   getPhoneCountryOptions,
@@ -55,15 +56,18 @@ export function PhoneCountryCombobox({
           aria-invalid={invalid}
           disabled={disabled}
           className={cn(
-            'h-9 min-w-38 shrink-0 justify-between gap-1 bg-card px-3 font-normal',
+            'h-9 min-w-0 max-w-full shrink-0 justify-between gap-1 bg-card px-3 font-normal sm:min-w-56',
             !invalid && 'border-border',
             invalid && 'border-destructive ring-[3px] ring-destructive/20 dark:border-destructive/50',
             className
           )}
         >
           <span className="flex min-w-0 items-center gap-1.5 truncate">
-            <span aria-hidden>{selected?.flag}</span>
-            <span className="text-muted-foreground">+{selected?.dial}</span>
+            {selected && (
+              <CountryFlag code={selected.code} className="h-3.5 w-5 border border-border/60" />
+            )}
+            <span className="min-w-0 truncate">{selected?.label}</span>
+            <span className="shrink-0 text-muted-foreground">+{selected?.dial}</span>
           </span>
           <ChevronsUpDown className="size-4 shrink-0 opacity-50" aria-hidden />
         </Button>
@@ -85,7 +89,7 @@ export function PhoneCountryCombobox({
                   }}
                 >
                   <span className="flex w-full min-w-0 items-center gap-2">
-                    <span aria-hidden>{c.flag}</span>
+                    <CountryFlag code={c.code} className="h-4 w-6 border border-border/60" />
                     <span className="min-w-0 flex-1 truncate">{c.label}</span>
                     <span className="shrink-0 text-muted-foreground">+{c.dial}</span>
                   </span>

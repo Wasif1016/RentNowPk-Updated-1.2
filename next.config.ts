@@ -39,6 +39,13 @@ const nextConfig: NextConfig = {
 
   images: {
     minimumCacheTTL: 14400, // 4 hours (v16 default — keep it)
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "flagcdn.com",
+        pathname: "/**",
+      },
+    ],
   },
 
   reactCompiler: true,
