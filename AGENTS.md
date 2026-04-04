@@ -11,7 +11,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - Database schema is at src/lib/db/schema.ts
 - Server Actions are in src/lib/actions/
 - Auth helper is getRequiredUser() in src/lib/auth/session.ts
-- cacheComponents: true is enabled — use "use cache" directive, NOT unstable_cache
+- cacheComponents: true is enabled — use "use cache" directive, NOT unstable_cache; root `layout.tsx` wraps `children` in `<Suspense fallback={null}>` so async dashboard layouts do not trigger blocking-route during prerender
 - proxy.ts replaces middleware.ts — never create middleware.ts; it calls `updateSession()` from `src/lib/supabase/middleware.ts` (no route auth checks in proxy — use `getRequiredUser()` in layouts)
 - App routes: see `docs/routes.md` (`(public)/`, `customer/`, `vendor/`, `admin/`)
 - params and searchParams are always Promises — always await them

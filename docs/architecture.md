@@ -4,6 +4,17 @@ Implementation map for current App Router segments: [routes.md](./routes.md).
 
 ---
 
+## Dashboards — auth, RBAC, and caching
+
+- **Route protection**: Customer, vendor, and admin areas use server layouts that call `getRequiredUser(role)` in [`src/lib/auth/session.ts`](../src/lib/auth/session.ts). The proxy only refreshes the Supabase session; it does not enforce roles.
+- **Per-request deduplication**: `getRequiredUser` / `getOptionalUser` share a single `React.cache()`’d load of `auth.getUser()` plus the `public.users` row, so layout and page work in one trip each.
+- **Private dashboard data**: Prefer **dynamic** async Server Components for strictly user-specific lists and counts. Do not `"use cache"` another user’s data.
+- **When to use `"use cache"`**: Only for read models that are explicitly scoped (e.g. tags from [`src/lib/constants/cache-tags.ts`](../src/lib/constants/cache-tags.ts) including `vendorId` / `userId`), with `cacheLife` profiles from `next.config.ts`. After writes, invalidate via `updateTag` / `revalidateTag` from Server Actions.
+- **Segment loading**: `loading.tsx` under `customer/`, `vendor/`, and `admin/` shows a lightweight skeleton for the main pane while nested routes load; the sidebar stays mounted on client navigations ([`next/link`](https://nextjs.org/docs/app/building-your-application/routing/linking-and-navigating) with prefetch).
+- **Cache Components**: [`src/app/layout.tsx`](../src/app/layout.tsx) wraps `{children}` in `<Suspense fallback={null}>` inside the toast providers so async dashboard layouts (auth) do not hit the [blocking-route](https://nextjs.org/docs/messages/blocking-route) error during prerender.
+
+---
+
 ## 1. Public Layer
 
 - Landing page with search by city, current location, car type, and other filters

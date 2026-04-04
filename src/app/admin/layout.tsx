@@ -1,19 +1,14 @@
-import { Suspense } from 'react'
+import Link from 'next/link'
 import { getRequiredUser } from '@/lib/auth/session'
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <Suspense
-      fallback={
-        <div className="flex h-screen items-center justify-center text-muted-foreground">Loading…</div>
-      }
-    >
-      <AdminLayoutInner>{children}</AdminLayoutInner>
-    </Suspense>
-  )
-}
+const nav = [
+  { href: '/admin', label: 'Dashboard' },
+  { href: '/admin/vendors', label: 'Vendors' },
+  { href: '/admin/bookings', label: 'Bookings' },
+  { href: '/admin/settings', label: 'Settings' },
+] as const
 
-async function AdminLayoutInner({ children }: { children: React.ReactNode }) {
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = await getRequiredUser('ADMIN')
 
   return (
@@ -21,21 +16,19 @@ async function AdminLayoutInner({ children }: { children: React.ReactNode }) {
       <aside className="w-64 border-r bg-card">
         <div className="p-4 border-b">
           <h2 className="font-semibold">Admin</h2>
-          <p className="text-sm text-muted-foreground">{user.email}</p>
+          <p className="text-sm text-muted-foreground truncate">{user.email}</p>
         </div>
         <nav className="p-4 space-y-2">
-          <a href="/admin" className="block px-3 py-2 rounded-md hover:bg-accent">
-            Dashboard
-          </a>
-          <a href="/admin/vendors" className="block px-3 py-2 rounded-md hover:bg-accent">
-            Vendors
-          </a>
-          <a href="/admin/bookings" className="block px-3 py-2 rounded-md hover:bg-accent">
-            Bookings
-          </a>
-          <a href="/admin/settings" className="block px-3 py-2 rounded-md hover:bg-accent">
-            Settings
-          </a>
+          {nav.map(({ href, label }) => (
+            <Link
+              key={href}
+              href={href}
+              prefetch
+              className="block px-3 py-2 rounded-md hover:bg-accent"
+            >
+              {label}
+            </Link>
+          ))}
         </nav>
       </aside>
       <main className="flex-1 overflow-auto p-6">{children}</main>

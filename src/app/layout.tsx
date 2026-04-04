@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Geist, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
@@ -44,7 +45,10 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
         <ToastProvider>
-          <AnchoredToastProvider>{children}</AnchoredToastProvider>
+          <AnchoredToastProvider>
+            {/* Boundary for async layouts (auth) under Cache Components — see blocking-route */}
+            <Suspense fallback={null}>{children}</Suspense>
+          </AnchoredToastProvider>
         </ToastProvider>
       </body>
     </html>

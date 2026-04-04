@@ -1,19 +1,13 @@
-import { Suspense } from 'react'
+import Link from 'next/link'
 import { getRequiredUser } from '@/lib/auth/session'
 
-export default function CustomerLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <Suspense
-      fallback={
-        <div className="flex h-screen items-center justify-center text-muted-foreground">Loading…</div>
-      }
-    >
-      <CustomerLayoutInner>{children}</CustomerLayoutInner>
-    </Suspense>
-  )
-}
+const nav = [
+  { href: '/customer', label: 'Dashboard' },
+  { href: '/customer/bookings', label: 'Bookings' },
+  { href: '/customer/settings', label: 'Settings' },
+] as const
 
-async function CustomerLayoutInner({ children }: { children: React.ReactNode }) {
+export default async function CustomerLayout({ children }: { children: React.ReactNode }) {
   const user = await getRequiredUser('CUSTOMER')
 
   return (
@@ -21,18 +15,19 @@ async function CustomerLayoutInner({ children }: { children: React.ReactNode }) 
       <aside className="w-64 border-r bg-card">
         <div className="p-4 border-b">
           <h2 className="font-semibold">RentNowPk</h2>
-          <p className="text-sm text-muted-foreground">{user.email}</p>
+          <p className="text-sm text-muted-foreground truncate">{user.email}</p>
         </div>
         <nav className="p-4 space-y-2">
-          <a href="/customer" className="block px-3 py-2 rounded-md hover:bg-accent">
-            Dashboard
-          </a>
-          <a href="/customer/bookings" className="block px-3 py-2 rounded-md hover:bg-accent">
-            Bookings
-          </a>
-          <a href="/customer/settings" className="block px-3 py-2 rounded-md hover:bg-accent">
-            Settings
-          </a>
+          {nav.map(({ href, label }) => (
+            <Link
+              key={href}
+              href={href}
+              prefetch
+              className="block px-3 py-2 rounded-md hover:bg-accent"
+            >
+              {label}
+            </Link>
+          ))}
         </nav>
       </aside>
       <main className="flex-1 overflow-auto p-6">{children}</main>
