@@ -3,27 +3,65 @@
 import { z } from 'zod'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { isValidPhoneCountryCode, parseLocalToE164 } from '@/lib/phone/vendor-countries'
 
-const pkPhone = z
-  .string()
-  .min(10)
-  .max(16)
-  .transform((s) => s.replace(/\s/g, ''))
-  .refine(
-    (s) => /^(\+92[0-9]{10}|03[0-9]{9})$/.test(s),
-    'Enter a valid Pakistan mobile (e.g. 03XXXXXXXXX or +92XXXXXXXXXX)'
-  )
-
-const VendorSignupSchema = z.object({
-  businessName: z.string().min(2).max(200).transform((s) => s.trim()),
-  email: z.string().email().transform((s) => s.trim().toLowerCase()),
-  whatsappPhone: pkPhone,
-  password: z.string().min(8).max(128),
-})
+export type VendorSignupFieldKey =
+  | 'businessName'
+  | 'email'
+  | 'countryCode'
+  | 'phoneLocal'
+  | 'password'
 
 export type VendorSignupState =
-  | { ok: false; error: string }
+  | {
+      ok: false
+      fieldErrors: Partial<Record<VendorSignupFieldKey, string>>
+      formError?: string
+    }
   | { ok: true; needsEmailConfirmation: true }
+
+const VendorSignupSchema = z.object({
+  businessName: z
+    .string()
+    .transform((s) => s.trim())
+    .pipe(z.string().min(2, 'Business name must be at least 2 characters.').max(200)),
+  email: z
+    .string()
+    .transform((s) => s.trim().toLowerCase())
+    .pipe(z.string().email('Enter a valid email address.')),
+  countryCode: z
+    .string()
+    .transform((s) => s.trim().toUpperCase())
+    .refine((c) => isValidPhoneCountryCode(c), {
+      message: 'Select a valid country.',
+    }),
+  phoneLocal: z.string().min(1, 'Enter your phone number.'),
+  password: z
+    .string()
+    .min(8, 'Password must be at least 8 characters.')
+    .max(128, 'Password is too long.'),
+})
+
+function zodIssuesToFieldErrors(
+  issues: z.core.$ZodIssue[]
+): Partial<Record<VendorSignupFieldKey, string>> {
+  const fieldErrors: Partial<Record<VendorSignupFieldKey, string>> = {}
+  const keys = new Set<VendorSignupFieldKey>([
+    'businessName',
+    'email',
+    'countryCode',
+    'phoneLocal',
+    'password',
+  ])
+  for (const issue of issues) {
+    const key = issue.path[0]
+    if (typeof key === 'string' && keys.has(key as VendorSignupFieldKey)) {
+      const k = key as VendorSignupFieldKey
+      if (!fieldErrors[k]) fieldErrors[k] = issue.message
+    }
+  }
+  return fieldErrors
+}
 
 function appUrl(): string {
   const u = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '')
@@ -41,14 +79,25 @@ export async function signUpVendorAction(
   const parsed = VendorSignupSchema.safeParse({
     businessName: formData.get('businessName'),
     email: formData.get('email'),
-    whatsappPhone: formData.get('whatsappPhone'),
+    countryCode: formData.get('countryCode'),
+    phoneLocal: formData.get('phoneLocal'),
     password: formData.get('password'),
   })
 
   if (!parsed.success) {
-    const msg = parsed.error.issues.map((i) => i.message).join(' ')
-    return { ok: false, error: msg || 'Invalid input' }
+    return { ok: false, fieldErrors: zodIssuesToFieldErrors(parsed.error.issues) }
   }
+
+  const phone = parseLocalToE164(parsed.data.countryCode, parsed.data.phoneLocal)
+  if (!phone.ok) {
+    return {
+      ok: false,
+      fieldErrors: { phoneLocal: phone.message },
+    }
+  }
+
+  const e164 = phone.e164
+  const businessName = parsed.data.businessName
 
   const supabase = await createClient()
   const nextPath = '/vendor/vehicles/add'
@@ -61,18 +110,30 @@ export async function signUpVendorAction(
       emailRedirectTo,
       data: {
         role: 'VENDOR',
-        business_name: parsed.data.businessName,
-        whatsapp_phone: parsed.data.whatsappPhone,
+        business_name: businessName,
+        whatsapp_phone: e164,
+        full_name: businessName,
+        display_name: businessName,
+        name: businessName,
+        phone: e164,
       },
     },
   })
 
   if (error) {
-    return { ok: false, error: mapAuthError(error.message) }
+    return {
+      ok: false,
+      fieldErrors: {},
+      formError: mapAuthError(error.message),
+    }
   }
 
   if (!data.user) {
-    return { ok: false, error: 'Could not create account. Try again.' }
+    return {
+      ok: false,
+      fieldErrors: {},
+      formError: 'Could not create account. Try again.',
+    }
   }
 
   if (data.session) {

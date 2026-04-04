@@ -1,6 +1,6 @@
 -- Run in Supabase SQL Editor after public.users and public.vendor_profiles exist.
 -- Syncs auth.users → public.users (+ vendor_profiles when role = VENDOR).
--- Metadata keys must match signUp options.data: role, business_name, whatsapp_phone
+-- Metadata keys must match signUp options.data: role, business_name, whatsapp_phone, phone, full_name, display_name, name
 
 create or replace function public.handle_new_user()
 returns trigger
@@ -12,7 +12,10 @@ declare
   meta jsonb := coalesce(new.raw_user_meta_data, '{}'::jsonb);
   r text := coalesce(meta->>'role', 'CUSTOMER');
   business text := nullif(trim(meta->>'business_name'), '');
-  phone text := nullif(trim(meta->>'whatsapp_phone'), '');
+  phone text := coalesce(
+    nullif(trim(meta->>'phone'), ''),
+    nullif(trim(meta->>'whatsapp_phone'), '')
+  );
   display_name text;
   role_val public.user_role;
 begin
@@ -28,17 +31,19 @@ begin
     split_part(coalesce(new.email, 'user@local'), '@', 1)
   );
 
-  insert into public.users (id, email, full_name, role)
+  insert into public.users (id, email, full_name, role, phone)
   values (
     new.id,
     coalesce(new.email, ''),
     display_name,
-    role_val
+    role_val,
+    phone
   )
   on conflict (id) do update set
     email = excluded.email,
     full_name = excluded.full_name,
-    role = excluded.role;
+    role = excluded.role,
+    phone = coalesce(excluded.phone, public.users.phone);
 
   if role_val = 'VENDOR'::public.user_role then
     if business is null or phone is null then

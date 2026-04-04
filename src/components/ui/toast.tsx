@@ -260,7 +260,6 @@ function AnchoredToasts() {
                         <X className="h-4 w-4" />
                       </Toast.Close>
                     </div>
-                    c
                     {toast.actionProps && (
                       <div className="flex justify-end">
                         <Toast.Action

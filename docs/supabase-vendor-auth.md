@@ -14,7 +14,7 @@
 
 3. **SQL: trigger**
    - Run [`supabase/triggers/handle_new_user.sql`](../supabase/triggers/handle_new_user.sql) in the Supabase SQL Editor once.
-   - This creates `public.users` and `vendor_profiles` when a row is inserted into `auth.users`, using `raw_user_meta_data` from `signUp` (`role`, `business_name`, `whatsapp_phone`).
+   - This creates `public.users` (including `phone`) and `vendor_profiles` when a row is inserted into `auth.users`, using `raw_user_meta_data` from `signUp`: `role`, `business_name`, `whatsapp_phone`, `phone` (E.164), `full_name`, `display_name`, and `name` (business name for Supabase Auth UI and `users.full_name`).
 
 ## Environment
 

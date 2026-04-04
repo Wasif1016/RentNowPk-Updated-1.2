@@ -1,8 +1,13 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { signUpVendorAction, type VendorSignupState } from '@/lib/actions/vendor-auth'
+import {
+  DEFAULT_PHONE_COUNTRY,
+  getPhoneCountryOptions,
+} from '@/lib/phone/vendor-countries'
+import { PhoneCountryCombobox } from '@/components/auth/phone-country-combobox'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -13,7 +18,14 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field'
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+  FieldError,
+} from '@/components/ui/field'
+import { showToast } from '@/components/ui/toast'
 
 async function signupFormAction(
   _prev: VendorSignupState | null,
@@ -22,30 +34,70 @@ async function signupFormAction(
   return signUpVendorAction(_prev, formData)
 }
 
+function SignupSuccessCard() {
+  const shown = useRef(false)
+  useEffect(() => {
+    if (shown.current) return
+    shown.current = true
+    showToast('Check your email', {
+      description: 'Open the link we sent to confirm your account, then you can add your first vehicle.',
+      type: 'success',
+      duration: 8000,
+    })
+  }, [])
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Check your email</CardTitle>
+        <CardDescription>
+          We sent a confirmation link. After you verify your email, you will be redirected to add
+          your first vehicle.
+        </CardDescription>
+      </CardHeader>
+      <CardFooter className="border-t pt-6 [.border-t]:pt-4">
+        <p className="text-center text-sm text-muted-foreground w-full">
+          Already confirmed?{' '}
+          <Link href="/auth/login" className="text-primary underline-offset-4 hover:underline">
+            Log in
+          </Link>
+        </p>
+      </CardFooter>
+    </Card>
+  )
+}
+
 export function SignupForm() {
   const [state, formAction, pending] = useActionState(signupFormAction, null)
+  const [countryCode, setCountryCode] = useState(DEFAULT_PHONE_COUNTRY)
+  const lastFormError = useRef<string | null>(null)
+
+  const countryMeta = useMemo(() => {
+    const opts = getPhoneCountryOptions()
+    return (
+      opts.find((c) => c.code === countryCode) ??
+      opts.find((c) => c.code === DEFAULT_PHONE_COUNTRY) ??
+      opts[0]
+    )
+  }, [countryCode])
+
+  useEffect(() => {
+    if (!state || state.ok) return
+    const msg = state.formError
+    if (!msg || lastFormError.current === msg) return
+    lastFormError.current = msg
+    showToast('Could not create account', {
+      description: msg,
+      type: 'error',
+      duration: 6000,
+    })
+  }, [state])
 
   if (state?.ok && state.needsEmailConfirmation) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Check your email</CardTitle>
-          <CardDescription>
-            We sent a confirmation link. After you verify your email, you will be redirected to add
-            your first vehicle.
-          </CardDescription>
-        </CardHeader>
-        <CardFooter className="border-t pt-6 [.border-t]:pt-4">
-          <p className="text-center text-sm text-muted-foreground w-full">
-            Already confirmed?{' '}
-            <Link href="/auth/login" className="text-primary underline-offset-4 hover:underline">
-              Log in
-            </Link>
-          </p>
-        </CardFooter>
-      </Card>
-    )
+    return <SignupSuccessCard />
   }
+
+  const fe = state && !state.ok ? state.fieldErrors : {}
 
   return (
     <Card>
@@ -56,17 +108,10 @@ export function SignupForm() {
         </CardDescription>
       </CardHeader>
       <form action={formAction}>
+        <input type="hidden" name="countryCode" value={countryCode} />
         <CardContent>
           <FieldGroup>
-            {state && !state.ok && (
-              <div
-                role="alert"
-                className="rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-              >
-                {state.error}
-              </div>
-            )}
-            <Field data-invalid={state && !state.ok ? true : undefined}>
+            <Field data-invalid={fe.businessName ? true : undefined}>
               <FieldLabel htmlFor="businessName">Business name</FieldLabel>
               <Input
                 id="businessName"
@@ -75,10 +120,12 @@ export function SignupForm() {
                 autoComplete="organization"
                 required
                 minLength={2}
-                aria-invalid={state && !state.ok ? true : undefined}
+                aria-invalid={fe.businessName ? true : undefined}
+                className="bg-card border-border"
               />
+              {fe.businessName && <FieldError>{fe.businessName}</FieldError>}
             </Field>
-            <Field data-invalid={state && !state.ok ? true : undefined}>
+            <Field data-invalid={fe.email ? true : undefined}>
               <FieldLabel htmlFor="email">Email</FieldLabel>
               <Input
                 id="email"
@@ -86,23 +133,44 @@ export function SignupForm() {
                 type="email"
                 autoComplete="email"
                 required
-                aria-invalid={state && !state.ok ? true : undefined}
+                aria-invalid={fe.email ? true : undefined}
+                className="bg-card border-border"
               />
+              {fe.email && <FieldError>{fe.email}</FieldError>}
             </Field>
-            <Field data-invalid={state && !state.ok ? true : undefined}>
-              <FieldLabel htmlFor="whatsappPhone">WhatsApp number</FieldLabel>
-              <Input
-                id="whatsappPhone"
-                name="whatsappPhone"
-                type="tel"
-                autoComplete="tel"
-                placeholder="03XXXXXXXXX or +92XXXXXXXXXX"
-                required
-                aria-invalid={state && !state.ok ? true : undefined}
-              />
-              <FieldDescription>Use a Pakistan mobile number (03… or +92…).</FieldDescription>
+            <Field data-invalid={fe.countryCode || fe.phoneLocal ? true : undefined}>
+              <FieldLabel>WhatsApp number</FieldLabel>
+              <div className="flex w-full gap-2 min-w-0">
+                <PhoneCountryCombobox
+                  value={countryCode}
+                  onValueChange={setCountryCode}
+                  disabled={pending}
+                  aria-invalid={fe.countryCode ? true : undefined}
+                />
+                <Input
+                  id="phoneLocal"
+                  name="phoneLocal"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel-national"
+                  placeholder={
+                    countryCode === DEFAULT_PHONE_COUNTRY
+                      ? 'e.g. 3147651112'
+                      : 'National number only'
+                  }
+                  required
+                  aria-invalid={fe.phoneLocal ? true : undefined}
+                  className="min-w-0 flex-1 bg-card border-border"
+                />
+              </div>
+              {fe.countryCode && <FieldError>{fe.countryCode}</FieldError>}
+              {fe.phoneLocal && <FieldError>{fe.phoneLocal}</FieldError>}
+              <FieldDescription>
+                Choose your country (default Pakistan), then enter your number without the country
+                code — we use {countryMeta.label} for formatting and validation.
+              </FieldDescription>
             </Field>
-            <Field data-invalid={state && !state.ok ? true : undefined}>
+            <Field data-invalid={fe.password ? true : undefined}>
               <FieldLabel htmlFor="password">Password</FieldLabel>
               <Input
                 id="password"
@@ -111,8 +179,10 @@ export function SignupForm() {
                 autoComplete="new-password"
                 required
                 minLength={8}
-                aria-invalid={state && !state.ok ? true : undefined}
+                aria-invalid={fe.password ? true : undefined}
+                className="bg-card border-border"
               />
+              {fe.password && <FieldError>{fe.password}</FieldError>}
               <FieldDescription>At least 8 characters.</FieldDescription>
             </Field>
           </FieldGroup>
