@@ -13,6 +13,17 @@ export type VendorVehicleListRow = {
   pickupFormattedAddress: string | null
 }
 
+/** Minimal vehicle list for dropdowns (id + name only). */
+export async function listVendorVehiclesForOffer(
+  vendorProfileId: string
+): Promise<{ id: string; name: string }[]> {
+  const rows = await db
+    .select({ id: vehicles.id, name: vehicles.name })
+    .from(vehicles)
+    .where(and(eq(vehicles.vendorId, vendorProfileId), eq(vehicles.isActive, true)))
+  return rows
+}
+
 export async function listVendorVehiclesWithMeta(
   vendorProfileId: string
 ): Promise<VendorVehicleListRow[]> {

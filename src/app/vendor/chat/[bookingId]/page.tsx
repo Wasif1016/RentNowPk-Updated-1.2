@@ -7,6 +7,10 @@ import {
   listBookingChatsForVendor,
   loadMessagesPage,
 } from '@/lib/db/chat'
+import { listVendorVehiclesForOffer } from '@/lib/db/vendor-vehicles'
+import { db } from '@/lib/db'
+import { vendorProfiles } from '@/lib/db/schema'
+import { eq } from 'drizzle-orm'
 
 export default async function VendorChatThreadPage({
   params,
@@ -23,6 +27,14 @@ export default async function VendorChatThreadPage({
   const rows = await listBookingChatsForVendor(user.id)
   const { messages, nextCursor } = await loadMessagesPage(ctx.threadId)
 
+  const [vp] = await db
+    .select({ id: vendorProfiles.id })
+    .from(vendorProfiles)
+    .where(eq(vendorProfiles.userId, user.id))
+    .limit(1)
+
+  const vehicles = vp ? await listVendorVehiclesForOffer(vp.id) : []
+
   return (
     <BookingChatShell rows={rows} basePath="/vendor/chat">
       <BookingChatPanel
@@ -36,6 +48,7 @@ export default async function VendorChatThreadPage({
         layout="embedded"
         bookingStatus={ctx.status}
         isVendor
+        vehicles={vehicles}
       />
     </BookingChatShell>
   )

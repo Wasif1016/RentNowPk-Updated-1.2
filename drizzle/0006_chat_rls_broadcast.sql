@@ -72,6 +72,11 @@ AS $$
 DECLARE
   thread_uuid uuid;
 BEGIN
+  -- Skip broadcast for messages blocked by contact-leak detection
+  IF TG_OP != 'DELETE' AND NEW.blocked_by_contact_rule = true THEN
+    RETURN NEW;
+  END IF;
+
   IF TG_OP = 'DELETE' THEN
     thread_uuid := OLD.thread_id;
   ELSE

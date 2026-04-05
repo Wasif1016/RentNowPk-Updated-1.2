@@ -1,15 +1,18 @@
 'use client'
 
 import { format, isSameDay } from 'date-fns'
+import { Check, CheckCheck, MapPin } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   vendorAcceptBooking,
   vendorRejectBooking,
 } from '@/lib/actions/booking-vendor-response'
 import { markThreadRead } from '@/lib/actions/chat-read'
-import { deleteChatMessage, editChatMessage, sendChatMessage } from '@/lib/actions/chat'
+import { deleteChatMessage, editChatMessage, sendChatMessage, toggleReaction, type ReactionSummary } from '@/lib/actions/chat'
+import { createOfferFromChat } from '@/lib/actions/booking-offers'
+import { OfferDialog } from '@/components/chat/offer-dialog'
 import {
   useBookingChat,
   isOptimisticMessageId,
@@ -61,6 +64,8 @@ type Props = {
   backHref?: string
   bookingStatus: BookingStatus
   isVendor: boolean
+  /** Vendor's fleet vehicles — used for Send Offer dialog. */
+  vehicles?: { id: string; name: string }[]
 }
 
 export function BookingChatPanel({
@@ -75,6 +80,7 @@ export function BookingChatPanel({
   backHref,
   bookingStatus,
   isVendor,
+  vehicles = [],
 }: Props) {
   const router = useRouter()
   const {
@@ -87,6 +93,8 @@ export function BookingChatPanel({
     removeOptimisticMessage,
     updateMessage,
     deleteMessage,
+    typingUsers,
+    onTextChange,
   } = useBookingChat({
     bookingId,
     threadId,
@@ -102,6 +110,7 @@ export function BookingChatPanel({
   const [vendorActionLoading, setVendorActionLoading] = useState<
     'accept' | 'reject' | null
   >(null)
+  const [offerOpen, setOfferOpen] = useState(false)
 
   // --- Edit state ---
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
@@ -110,6 +119,39 @@ export function BookingChatPanel({
   const [editError, setEditError] = useState<string | null>(null)
 
   // --- Delete confirm state ---
+  const [reactionsByMessage, setReactionsByMessage] = useState<
+    Record<string, ReactionSummary[]>
+  >({})
+
+  const handleReaction = useCallback(
+    async (messageId: string, emoji: string) => {
+      const res = await toggleReaction(bookingId, messageId, emoji)
+      if (!res.ok) return
+      setReactionsByMessage((prev) => {
+        const existing = prev[messageId] ?? []
+        if (res.reacted) {
+          return {
+            ...prev,
+            [messageId]: [
+              ...existing.filter((r) => r.emoji !== emoji),
+              { emoji, count: (existing.find((r) => r.emoji === emoji)?.count ?? 0) + 1, reacted: true },
+            ],
+          }
+        }
+        return {
+          ...prev,
+          [messageId]: existing
+            .map((r) =>
+              r.emoji === emoji
+                ? { ...r, count: r.count - 1 }
+                : r
+            )
+            .filter((r) => r.count > 0),
+        }
+      })
+    },
+    [bookingId]
+  )
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
 
@@ -155,6 +197,8 @@ export function BookingChatPanel({
       content: text,
       createdAt: new Date().toISOString(),
       editedAt: null,
+      deliveredAt: null,
+      seenAt: null,
     }
     addOptimisticMessage(optimistic)
     setDraft('')
@@ -241,6 +285,67 @@ export function BookingChatPanel({
     }
   }
 
+  async function handleShareLocation() {
+    if (!navigator.geolocation) {
+      setError('Location is not supported by your browser.')
+      return
+    }
+    setError(null)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords
+        const mapsUrl = `https://www.google.com/maps?q=${latitude},${longitude}`
+        void handleSendLocationMessage(mapsUrl)
+      },
+      () => {
+        setError('Could not get your location. Please check your browser permissions.')
+      }
+    )
+  }
+
+  async function handleSendLocationMessage(mapsUrl: string) {
+    const tempId = `temp-${crypto.randomUUID()}`
+    const optimistic: ChatMessageDto = {
+      id: tempId,
+      threadId,
+      senderId: currentUserId,
+      content: mapsUrl,
+      createdAt: new Date().toISOString(),
+      editedAt: null,
+      deliveredAt: null,
+      seenAt: null,
+    }
+    addOptimisticMessage(optimistic)
+    setDraft('')
+    const res = await sendChatMessage(bookingId, mapsUrl)
+    if (!res.ok) {
+      removeOptimisticMessage(tempId)
+      setError(res.error)
+      return
+    }
+    replaceOptimisticMessage(tempId, res.message)
+  }
+
+  async function handleOfferSubmit(values: {
+    vehicleId: string
+    pricePerDay: string
+    totalPrice: string
+    note: string
+  }) {
+    const res = await createOfferFromChat(
+      bookingId,
+      values.vehicleId,
+      values.pricePerDay,
+      values.totalPrice,
+      values.note
+    )
+    if (!res.ok) {
+      setError(res.error)
+      return
+    }
+    setOfferOpen(false)
+  }
+
   const shellClass =
     layout === 'standalone'
       ? 'flex min-h-[min(70vh,560px)] flex-col rounded-xl border border-border bg-card'
@@ -258,8 +363,21 @@ export function BookingChatPanel({
               ← Back to bookings
             </Link>
           ) : null}
-          <h1 className="text-foreground text-lg font-semibold">{title}</h1>
-          <p className="text-muted-foreground text-sm">{subtitle}</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-foreground text-lg font-semibold">{title}</h1>
+              <p className="text-muted-foreground text-sm">{subtitle}</p>
+            </div>
+            {isVendor && bookingStatus === 'CONFIRMED' && (
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => setOfferOpen(true)}
+              >
+                Send Offer
+              </Button>
+            )}
+          </div>
         </div>
       </header>
 
@@ -313,6 +431,8 @@ export function BookingChatPanel({
             onEditCancel: () => setEditingMessageId(null),
             onStartEdit: startEdit,
             onDeleteRequest: (id) => setDeleteConfirmId(id),
+            reactionsByMessage,
+            onReaction: handleReaction,
           })}
         </div>
       </ScrollArea>
@@ -323,11 +443,20 @@ export function BookingChatPanel({
         </p>
       ) : null}
 
+      {typingUsers.length > 0 ? (
+        <div className="text-muted-foreground px-4 py-0.5 text-xs italic">
+          {typingUsers.length === 1 ? 'Someone is typing…' : 'Several people are typing…'}
+        </div>
+      ) : null}
+
       <footer className="border-border shrink-0 border-t p-3">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
           <Textarea
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(e) => {
+              setDraft(e.target.value)
+              void onTextChange()
+            }}
             placeholder="Type a message…"
             rows={2}
             className="min-h-0 flex-1"
@@ -338,6 +467,18 @@ export function BookingChatPanel({
               }
             }}
           />
+          {bookingStatus === 'CONFIRMED' && (
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="shrink-0"
+              onClick={() => void handleShareLocation()}
+              title="Share current location"
+            >
+              <MapPin className="h-4 w-4" />
+            </Button>
+          )}
           <Button
             type="button"
             onClick={() => void handleSend()}
@@ -370,6 +511,13 @@ export function BookingChatPanel({
           if (deleteConfirmId) void handleDeleteConfirm(deleteConfirmId)
         }}
       />
+
+      <OfferDialog
+        open={offerOpen}
+        onOpenChange={setOfferOpen}
+        vehicles={vehicles}
+        onSubmit={handleOfferSubmit}
+      />
     </div>
   )
 }
@@ -388,10 +536,12 @@ type MessageListProps = {
   onEditCancel: () => void
   onStartEdit: (msg: ChatMessageDto) => void
   onDeleteRequest: (msgId: string) => void
+  reactionsByMessage: Record<string, ReactionSummary[]>
+  onReaction: (messageId: string, emoji: string) => void
 }
 
 function renderMessageList(props: MessageListProps) {
-  const { messages, currentUserId, editingMessageId, editDraft, editSaving, editError, onEditDraftChange, onEditSave, onEditCancel, onStartEdit, onDeleteRequest } = props
+  const { messages, currentUserId, editingMessageId, editDraft, editSaving, editError, onEditDraftChange, onEditSave, onEditCancel, onStartEdit, onDeleteRequest, reactionsByMessage, onReaction } = props
 
   const elements: React.ReactNode[] = []
   let lastDate: Date | null = null
@@ -419,6 +569,8 @@ function renderMessageList(props: MessageListProps) {
         onEditCancel={onEditCancel}
         onStartEdit={onStartEdit}
         onDeleteRequest={onDeleteRequest}
+        reactions={reactionsByMessage[msg.id] ?? []}
+        onReaction={onReaction}
       />
     )
   }
@@ -457,6 +609,8 @@ type BubbleProps = {
   onEditCancel: () => void
   onStartEdit: (msg: ChatMessageDto) => void
   onDeleteRequest: (msgId: string) => void
+  reactions: ReactionSummary[]
+  onReaction: (messageId: string, emoji: string) => void
 }
 
 function MessageBubbleItem({
@@ -472,6 +626,8 @@ function MessageBubbleItem({
   onEditCancel,
   onStartEdit,
   onDeleteRequest,
+  reactions,
+  onReaction,
 }: BubbleProps) {
   const time = format(new Date(message.createdAt), 'MMM d, h:mm a')
 
@@ -516,6 +672,8 @@ function MessageBubbleItem({
     )
   }
 
+  const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥']
+
   return (
     <div
       className={cn(
@@ -535,6 +693,35 @@ function MessageBubbleItem({
         >
           {message.content}
         </div>
+
+        {/* Reaction picker — visible on hover for all messages */}
+        {!pending && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className={cn(
+                  'absolute top-0 opacity-0 group-hover:opacity-100 transition-opacity',
+                  'p-1 -translate-y-1 rounded-full bg-muted text-muted-foreground hover:text-foreground'
+                )}
+                aria-label="Add reaction"
+              >
+                <SmileIcon />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="flex gap-0.5 p-1">
+              {QUICK_EMOJIS.map((e) => (
+                <button
+                  key={e}
+                  onClick={() => onReaction(message.id, e)}
+                  className="hover:bg-accent rounded px-1.5 py-1 text-base leading-none transition-colors"
+                >
+                  {e}
+                </button>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+
         {isOwn ? (
           <MessageOwnActions
             message={message}
@@ -543,8 +730,35 @@ function MessageBubbleItem({
           />
         ) : null}
       </div>
-      <span className="text-muted-foreground px-1 text-[10px]">
-        {time}
+
+      {/* Reaction pills */}
+      {reactions.length > 0 ? (
+        <div className="flex flex-wrap gap-1 px-1">
+          {reactions.map((r) => (
+            <button
+              key={r.emoji}
+              onClick={() => onReaction(message.id, r.emoji)}
+              className={cn(
+                'inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-xs transition-colors',
+                r.reacted
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-muted bg-muted/50 text-muted-foreground hover:border-primary'
+              )}
+            >
+              <span>{r.emoji}</span>
+              <span>{r.count}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      <span className="text-muted-foreground flex items-center gap-0.5 px-1 text-[10px]">
+        {!isOwn && message.seenAt ? (
+          <CheckCheck className="text-primary h-3 w-3 shrink-0" aria-label="Seen" />
+        ) : !isOwn ? (
+          <Check className="text-muted-foreground h-3 w-3 shrink-0" aria-label="Delivered" />
+        ) : null}
+        <span>{time}</span>
         {message.editedAt ? (
           <span className="ml-1 italic">(edited)</span>
         ) : null}
@@ -588,6 +802,27 @@ function MessageOwnActions({
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+  )
+}
+
+function SmileIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="10" />
+      <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+      <line x1="9" x2="9.01" y1="9" y2="9" />
+      <line x1="15" x2="15.01" y1="9" y2="9" />
+    </svg>
   )
 }
 

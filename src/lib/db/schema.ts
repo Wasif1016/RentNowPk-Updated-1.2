@@ -353,6 +353,52 @@ export const bookings = pgTable(
   })
 );
 
+// ============================================================
+// BOOKING OFFERS — vendor-initiated counteroffers sent via chat
+// ============================================================
+
+export const bookingOfferStatusEnum = pgEnum('booking_offer_status', [
+  'PENDING',
+  'ACCEPTED',
+  'REJECTED',
+  'EXPIRED',
+])
+
+export const bookingOffers = pgTable(
+  'booking_offers',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    bookingId: uuid('booking_id')
+      .notNull()
+      .references(() => bookings.id),
+    vehicleId: uuid('vehicle_id')
+      .notNull()
+      .references(() => vehicles.id),
+    vendorId: uuid('vendor_id')
+      .notNull()
+      .references(() => vendorProfiles.id),
+
+    pricePerDay: decimal('price_per_day', { precision: 10, scale: 2 }).notNull(),
+    totalPrice: decimal('total_price', { precision: 10, scale: 2 }).notNull(),
+    note: text('note'),
+
+    status: bookingOfferStatusEnum('status')
+      .notNull()
+      .default('PENDING'),
+
+    respondedAt: timestamp('responded_at', { withTimezone: true }),
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => ({
+    bookingIdx: index('booking_offers_booking_idx').on(t.bookingId),
+    statusIdx: index('booking_offers_status_idx').on(t.status),
+  })
+);
+
 export const vehicleDateBlocks = pgTable(
   "vehicle_date_blocks",
   {
@@ -477,6 +523,35 @@ export const chatThreadParticipantReadState = pgTable(
     userIdx: index("chat_participant_read_user_idx").on(t.userId),
   })
 );
+
+// ============================================================
+// MESSAGE REACTIONS — per-user emoji reactions to messages
+// ============================================================
+
+export const messageReactions = pgTable(
+  'message_reactions',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    messageId: uuid('message_id')
+      .notNull()
+      .references(() => messages.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    emoji: text('emoji').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => ({
+    msgUserUnique: uniqueIndex('message_reactions_msg_user_unique').on(
+      t.messageId,
+      t.userId
+    ),
+    messageIdx: index('message_reactions_message_idx').on(t.messageId),
+    userIdx: index('message_reactions_user_idx').on(t.userId),
+  })
+)
 
 // ============================================================
 // REVIEWS — one per booking (customer → vendor / vehicle)
@@ -636,6 +711,7 @@ export const vendorProfilesRelations = relations(
     vehicles: many(vehicles),
     bookings: many(bookings),
     reviewsReceived: many(reviews),
+    offers: many(bookingOffers),
   })
 );
 
@@ -649,6 +725,7 @@ export const vehiclesRelations = relations(vehicles, ({ one, many }) => ({
   dateBlocks: many(vehicleDateBlocks),
   bookings: many(bookings),
   reviews: many(reviews),
+  offers: many(bookingOffers),
 }));
 
 export const vehicleImagesRelations = relations(vehicleImages, ({ one }) => ({
@@ -701,7 +778,23 @@ export const bookingsRelations = relations(bookings, ({ one, many }) => ({
     references: [chatThreads.bookingId],
   }),
   reviews: many(reviews),
+  offers: many(bookingOffers),
 }));
+
+export const bookingOffersRelations = relations(bookingOffers, ({ one }) => ({
+  booking: one(bookings, {
+    fields: [bookingOffers.bookingId],
+    references: [bookings.id],
+  }),
+  vehicle: one(vehicles, {
+    fields: [bookingOffers.vehicleId],
+    references: [vehicles.id],
+  }),
+  vendor: one(vendorProfiles, {
+    fields: [bookingOffers.vendorId],
+    references: [vendorProfiles.id],
+  }),
+}))
 
 export const chatThreadsRelations = relations(chatThreads, ({ one, many }) => ({
   booking: one(bookings, {
@@ -726,7 +819,7 @@ export const chatThreadParticipantReadStateRelations = relations(
   })
 );
 
-export const messagesRelations = relations(messages, ({ one }) => ({
+export const messagesRelations = relations(messages, ({ one, many }) => ({
   thread: one(chatThreads, {
     fields: [messages.threadId],
     references: [chatThreads.id],
@@ -735,7 +828,22 @@ export const messagesRelations = relations(messages, ({ one }) => ({
     fields: [messages.senderId],
     references: [users.id],
   }),
+  reactions: many(messageReactions),
 }));
+
+export const messageReactionsRelations = relations(
+  messageReactions,
+  ({ one }) => ({
+    message: one(messages, {
+      fields: [messageReactions.messageId],
+      references: [messages.id],
+    }),
+    user: one(users, {
+      fields: [messageReactions.userId],
+      references: [users.id],
+    }),
+  })
+)
 
 export const reviewsRelations = relations(reviews, ({ one }) => ({
   booking: one(bookings, {

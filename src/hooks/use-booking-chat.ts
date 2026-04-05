@@ -31,6 +31,8 @@ function parseBroadcastRecord(payload: unknown): ChatMessageDto | null {
   const senderId = rec.sender_id
   const content = rec.content
   const createdAt = rec.created_at
+  const deliveredAt = rec.delivered_at
+  const seenAt = rec.seen_at
   if (
     typeof id !== 'string' ||
     typeof threadId !== 'string' ||
@@ -46,6 +48,18 @@ function parseBroadcastRecord(payload: unknown): ChatMessageDto | null {
         ? createdAt.toISOString()
         : null
   if (!created) return null
+  const delivered =
+    typeof deliveredAt === 'string'
+      ? deliveredAt
+      : deliveredAt instanceof Date
+        ? deliveredAt.toISOString()
+        : null
+  const seen =
+    typeof seenAt === 'string'
+      ? seenAt
+      : seenAt instanceof Date
+        ? seenAt.toISOString()
+        : null
   return {
     id,
     threadId,
@@ -53,6 +67,8 @@ function parseBroadcastRecord(payload: unknown): ChatMessageDto | null {
     content,
     createdAt: created,
     editedAt: null,
+    deliveredAt: delivered,
+    seenAt: seen,
   }
 }
 
@@ -131,8 +147,11 @@ export function useBookingChat(options: {
     initialNextCursor
   )
   const [loadingOlder, setLoadingOlder] = useState(false)
+  const [typingUsers, setTypingUsers] = useState<string[]>([])
   const idsRef = useRef<Set<string>>(new Set(initialMessages.map((m) => m.id)))
   const soundPlayedRef = useRef<Set<string>>(new Set())
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const channelRef = useRef<RealtimeChannel | null>(null)
 
   useEffect(() => {
     idsRef.current = new Set(initialMessages.map((m) => m.id))
@@ -197,6 +216,32 @@ export function useBookingChat(options: {
     setMessages((prev) => prev.filter((m) => m.id !== messageId))
   }, [])
 
+  /** Broadcast a typing indicator state to the channel. */
+  const broadcastTyping = useCallback(
+    (isTyping: boolean) => {
+      const ch = channelRef.current
+      if (!ch) return
+      void ch.send({
+        type: 'broadcast',
+        event: 'TYPING',
+        payload: { userId: currentUserId, isTyping },
+      })
+    },
+    [currentUserId]
+  )
+
+  /** Call this on every keystroke — debounces the broadcast automatically. */
+  const onTextChange = useCallback(() => {
+    broadcastTyping(true)
+    if (typingTimerRef.current !== null) {
+      clearTimeout(typingTimerRef.current)
+    }
+    typingTimerRef.current = setTimeout(() => {
+      broadcastTyping(false)
+      typingTimerRef.current = null
+    }, 3000)
+  }, [broadcastTyping])
+
   const loadOlder = useCallback(async () => {
     if (!nextCursor || loadingOlder) return
     setLoadingOlder(true)
@@ -232,7 +277,6 @@ export function useBookingChat(options: {
   useEffect(() => {
     const supabase = createClient()
     const channelName = chatThreadChannelName(threadId)
-    const channelRef: { current: RealtimeChannel | null } = { current: null }
     let cancelled = false
 
     void (async () => {
@@ -284,7 +328,20 @@ export function useBookingChat(options: {
               new Date(b.createdAt).getTime()
           )
         })
-      }).subscribe((status) => {
+      })
+
+      ch.on('broadcast', { event: 'TYPING' }, (payload) => {
+        const p = payload as { userId?: string; isTyping?: boolean }
+        if (!p.userId || p.userId === currentUserId) return
+        setTypingUsers((prev) => {
+          if (p.isTyping) {
+            return prev.includes(p.userId!) ? prev : [...prev, p.userId!]
+          }
+          return prev.filter((u) => u !== p.userId!)
+        })
+      })
+
+      ch.subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           void refetchLatest()
         }
@@ -297,6 +354,9 @@ export function useBookingChat(options: {
       channelRef.current = null
       if (ch) {
         void supabase.removeChannel(ch)
+      }
+      if (typingTimerRef.current !== null) {
+        clearTimeout(typingTimerRef.current)
       }
     }
   }, [threadId, bookingId, refetchLatest, currentUserId])
@@ -312,5 +372,7 @@ export function useBookingChat(options: {
     removeOptimisticMessage,
     updateMessage,
     deleteMessage,
+    typingUsers,
+    onTextChange,
   }
 }

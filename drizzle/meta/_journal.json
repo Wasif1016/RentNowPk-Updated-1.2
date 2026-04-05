@@ -55,7 +55,21 @@
       "idx": 7,
       "version": "7",
       "when": 1775375071970,
+      "tag": "0007_reactions_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1775388639908,
       "tag": "0008_chat_read_state",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1775386779780,
+      "tag": "0009_booking_offers_table",
       "breakpoints": true
     }
   ]

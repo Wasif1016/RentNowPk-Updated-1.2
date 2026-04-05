@@ -174,6 +174,8 @@ export async function getUnreadCountsByThreadId(
 
 /**
  * Sets read cursor to the latest non-deleted message time in the thread (or now if empty).
+ * Also writes seen_at on all non-own delivered messages that haven't been seen yet,
+ * completing the read-receipt tick-mark chain.
  */
 export async function upsertLastReadToNow(
   threadId: string,
@@ -208,6 +210,19 @@ export async function upsertLastReadToNow(
           updatedAt: now,
         },
       })
+
+    // Mark all messages from the OTHER party as "seen" — these drive tick marks
+    await db
+      .update(messages)
+      .set({ seenAt: now })
+      .where(
+        and(
+          eq(messages.threadId, threadId),
+          ne(messages.senderId, userId),
+          isNull(messages.seenAt),
+          isNull(messages.deletedAt)
+        )
+      )
   } catch (e) {
     if (isMissingChatReadStateRelation(e)) {
       warnMissingReadStateTableOnce()
