@@ -6,12 +6,10 @@ import { UnreadBadgeRefreshOnFocus } from '@/components/dashboard/unread-badge-r
 import { VENDOR_NAV } from '@/components/dashboard/dashboard-nav'
 import { VendorVerificationBanner } from '@/components/vendor/vendor-verification-banner'
 import { getCachedTotalUnreadForUser } from '@/lib/db/chat-unread-cached'
-import { getUnreadNotificationCount } from '@/lib/actions/notifications'
 
 export default async function VendorLayout({ children }: { children: React.ReactNode }) {
   const user = await getRequiredUser('VENDOR')
   const messagesUnread = await getCachedTotalUnreadForUser(user.id)
-  const notificationsUnread = await getUnreadNotificationCount(user.id)
   const vendorProfile = await getVendorProfileByUserId(user.id)
   const bannerMode = vendorProfile
     ? getVendorVerificationBannerMode(vendorProfile)
@@ -25,7 +23,6 @@ export default async function VendorLayout({ children }: { children: React.React
       sidebarUserName={displayName}
       navUnreadCounts={{
         '/vendor/chat': messagesUnread,
-        '/vendor/notifications': notificationsUnread,
       }}
       user={{
         email: user.email,

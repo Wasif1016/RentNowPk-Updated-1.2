@@ -18,7 +18,7 @@ import {
   type MessageCursor,
 } from '@/lib/db/chat'
 import { db } from '@/lib/db'
-import { bookings, chatThreads, incidents, messages, messageReactions, notifications, users } from '@/lib/db/schema'
+import { bookings, chatThreads, incidents, messages, users } from '@/lib/db/schema'
 import { ChatMessageContentSchema } from '@/lib/validation/chat'
 
 type ContactLeakType = 'PHONE_NUMBER' | 'EMAIL_ADDRESS' | 'SOCIAL_HANDLE'
@@ -149,18 +149,6 @@ export async function sendChatMessage(
     user.id === ctx.customerUserId ? ctx.vendorUserId : ctx.customerUserId
   updateTag(unreadMessagesTag(recipientUserId))
 
-  // Insert in-app notification for the recipient
-  await db.insert(notifications).values({
-    userId: recipientUserId,
-    type: 'MESSAGE',
-    title: 'New message',
-    body: parsed.data.slice(0, 80),
-    actionUrl: `/customer/chat/${bookingId}`,
-    sentInApp: true,
-    entityType: 'messages',
-    entityId: inserted.id,
-  })
-
   const dto: ChatMessageDto = {
     id: inserted.id,
     threadId: inserted.threadId,
@@ -275,89 +263,6 @@ export async function deleteChatMessage(
   updateTag(vendorBookingsTag(ctx.vendorUserId))
 
   return { ok: true }
-}
-
-export type ToggleReactionResult =
-  | { ok: true; reacted: boolean }
-  | { ok: false; error: string }
-
-const VALID_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥'] as const
-type ValidEmoji = (typeof VALID_EMOJIS)[number]
-
-/**
- * Toggle a reaction on a message. If the user already reacted with this emoji,
- * it removes the reaction. Otherwise it adds it.
- */
-export async function toggleReaction(
-  bookingId: string,
-  messageId: string,
-  emoji: string
-): Promise<ToggleReactionResult> {
-  const user = await requireCustomerOrVendor()
-
-  if (!VALID_EMOJIS.includes(emoji as ValidEmoji)) {
-    return { ok: false, error: 'Invalid emoji.' }
-  }
-
-  const ctx = await getChatContextForBooking({ bookingId, userId: user.id })
-  if (!ctx) {
-    return { ok: false, error: 'Chat not found.' }
-  }
-
-  // Check if reaction already exists
-  const [existing] = await db
-    .select({ id: messageReactions.id })
-    .from(messageReactions)
-    .where(
-      and(
-        eq(messageReactions.messageId, messageId),
-        eq(messageReactions.userId, user.id),
-        eq(messageReactions.emoji, emoji)
-      )
-    )
-
-  if (existing) {
-    // Remove reaction
-    await db
-      .delete(messageReactions)
-      .where(eq(messageReactions.id, existing.id))
-    return { ok: true, reacted: false }
-  }
-
-  // Add reaction
-  await db
-    .insert(messageReactions)
-    .values({ messageId, userId: user.id, emoji })
-
-  return { ok: true, reacted: true }
-}
-
-export type ReactionSummary = {
-  emoji: string
-  count: number
-  reacted: boolean
-}
-
-export async function getReactionsForThread(
-  threadId: string,
-  currentUserId: string
-): Promise<ReactionSummary[]> {
-  const rows = await db
-    .select({
-      emoji: messageReactions.emoji,
-      n: sql<number>`count(*)::int`,
-      hasMine: sql<boolean>`bool_or(${messageReactions.userId} = ${currentUserId})`,
-    })
-    .from(messageReactions)
-    .innerJoin(messages, eq(messageReactions.messageId, messages.id))
-    .where(eq(messages.threadId, threadId))
-    .groupBy(messageReactions.emoji)
-
-  return rows.map((r) => ({
-    emoji: r.emoji,
-    count: Number(r.n),
-    reacted: r.hasMine,
-  }))
 }
 
 /**

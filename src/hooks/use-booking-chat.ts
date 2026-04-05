@@ -147,10 +147,8 @@ export function useBookingChat(options: {
     initialNextCursor
   )
   const [loadingOlder, setLoadingOlder] = useState(false)
-  const [typingUsers, setTypingUsers] = useState<string[]>([])
   const idsRef = useRef<Set<string>>(new Set(initialMessages.map((m) => m.id)))
   const soundPlayedRef = useRef<Set<string>>(new Set())
-  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const channelRef = useRef<RealtimeChannel | null>(null)
 
   useEffect(() => {
@@ -215,32 +213,6 @@ export function useBookingChat(options: {
     idsRef.current.delete(messageId)
     setMessages((prev) => prev.filter((m) => m.id !== messageId))
   }, [])
-
-  /** Broadcast a typing indicator state to the channel. */
-  const broadcastTyping = useCallback(
-    (isTyping: boolean) => {
-      const ch = channelRef.current
-      if (!ch) return
-      void ch.send({
-        type: 'broadcast',
-        event: 'TYPING',
-        payload: { userId: currentUserId, isTyping },
-      })
-    },
-    [currentUserId]
-  )
-
-  /** Call this on every keystroke — debounces the broadcast automatically. */
-  const onTextChange = useCallback(() => {
-    broadcastTyping(true)
-    if (typingTimerRef.current !== null) {
-      clearTimeout(typingTimerRef.current)
-    }
-    typingTimerRef.current = setTimeout(() => {
-      broadcastTyping(false)
-      typingTimerRef.current = null
-    }, 3000)
-  }, [broadcastTyping])
 
   const loadOlder = useCallback(async () => {
     if (!nextCursor || loadingOlder) return
@@ -330,17 +302,6 @@ export function useBookingChat(options: {
         })
       })
 
-      ch.on('broadcast', { event: 'TYPING' }, (payload) => {
-        const p = payload as { userId?: string; isTyping?: boolean }
-        if (!p.userId || p.userId === currentUserId) return
-        setTypingUsers((prev) => {
-          if (p.isTyping) {
-            return prev.includes(p.userId!) ? prev : [...prev, p.userId!]
-          }
-          return prev.filter((u) => u !== p.userId!)
-        })
-      })
-
       ch.subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           void refetchLatest()
@@ -354,9 +315,6 @@ export function useBookingChat(options: {
       channelRef.current = null
       if (ch) {
         void supabase.removeChannel(ch)
-      }
-      if (typingTimerRef.current !== null) {
-        clearTimeout(typingTimerRef.current)
       }
     }
   }, [threadId, bookingId, refetchLatest, currentUserId])
@@ -372,7 +330,5 @@ export function useBookingChat(options: {
     removeOptimisticMessage,
     updateMessage,
     deleteMessage,
-    typingUsers,
-    onTextChange,
   }
 }

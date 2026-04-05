@@ -525,35 +525,6 @@ export const chatThreadParticipantReadState = pgTable(
 );
 
 // ============================================================
-// MESSAGE REACTIONS — per-user emoji reactions to messages
-// ============================================================
-
-export const messageReactions = pgTable(
-  'message_reactions',
-  {
-    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
-    messageId: uuid('message_id')
-      .notNull()
-      .references(() => messages.id, { onDelete: 'cascade' }),
-    userId: uuid('user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
-    emoji: text('emoji').notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-  },
-  (t) => ({
-    msgUserUnique: uniqueIndex('message_reactions_msg_user_unique').on(
-      t.messageId,
-      t.userId
-    ),
-    messageIdx: index('message_reactions_message_idx').on(t.messageId),
-    userIdx: index('message_reactions_user_idx').on(t.userId),
-  })
-)
-
-// ============================================================
 // REVIEWS — one per booking (customer → vendor / vehicle)
 // ============================================================
 
@@ -819,7 +790,7 @@ export const chatThreadParticipantReadStateRelations = relations(
   })
 );
 
-export const messagesRelations = relations(messages, ({ one, many }) => ({
+export const messagesRelations = relations(messages, ({ one }) => ({
   thread: one(chatThreads, {
     fields: [messages.threadId],
     references: [chatThreads.id],
@@ -828,22 +799,7 @@ export const messagesRelations = relations(messages, ({ one, many }) => ({
     fields: [messages.senderId],
     references: [users.id],
   }),
-  reactions: many(messageReactions),
 }));
-
-export const messageReactionsRelations = relations(
-  messageReactions,
-  ({ one }) => ({
-    message: one(messages, {
-      fields: [messageReactions.messageId],
-      references: [messages.id],
-    }),
-    user: one(users, {
-      fields: [messageReactions.userId],
-      references: [users.id],
-    }),
-  })
-)
 
 export const reviewsRelations = relations(reviews, ({ one }) => ({
   booking: one(bookings, {
