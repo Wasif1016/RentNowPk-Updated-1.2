@@ -16,6 +16,7 @@ import {
   users,
   vehicles,
 } from '@/lib/db/schema'
+import { getUnreadCountsByThreadId } from '@/lib/db/chat-unread'
 
 export type ChatMessageDto = {
   id: string
@@ -23,6 +24,7 @@ export type ChatMessageDto = {
   senderId: string
   content: string
   createdAt: string
+  editedAt: string | null
 }
 
 export type MessageCursor = {
@@ -121,6 +123,7 @@ export async function loadMessagesPage(
       senderId: messages.senderId,
       content: messages.content,
       createdAt: messages.createdAt,
+      editedAt: messages.editedAt,
     })
     .from(messages)
     .where(and(...conditions))
@@ -146,6 +149,7 @@ export async function loadMessagesPage(
       senderId: m.senderId,
       content: m.content,
       createdAt: m.createdAt.toISOString(),
+      editedAt: m.editedAt ? m.editedAt.toISOString() : null,
     })),
     nextCursor,
   }
@@ -158,6 +162,7 @@ export type BookingListRow = {
   pickupAt: Date
   vehicleName: string
   lastMessageAt: Date | null
+  unreadCount: number
 }
 
 export async function listBookingChatsForCustomer(
@@ -182,13 +187,21 @@ export async function listBookingChatsForCustomer(
       )
     )
 
-  return rows.map((r) => ({
+  const mapped = rows.map((r) => ({
     bookingId: r.bookingId,
     threadId: r.threadId,
     status: r.status,
     pickupAt: r.pickupAt,
     vehicleName: r.vehicleName,
     lastMessageAt: r.lastMessageAt,
+  }))
+  const unread = await getUnreadCountsByThreadId(
+    customerUserId,
+    mapped.map((m) => m.threadId)
+  )
+  return mapped.map((r) => ({
+    ...r,
+    unreadCount: unread.get(r.threadId) ?? 0,
   }))
 }
 
@@ -214,12 +227,20 @@ export async function listBookingChatsForVendor(
       )
     )
 
-  return rows.map((r) => ({
+  const mapped = rows.map((r) => ({
     bookingId: r.bookingId,
     threadId: r.threadId,
     status: r.status,
     pickupAt: r.pickupAt,
     vehicleName: r.vehicleName,
     lastMessageAt: r.lastMessageAt,
+  }))
+  const unread = await getUnreadCountsByThreadId(
+    vendorUserId,
+    mapped.map((m) => m.threadId)
+  )
+  return mapped.map((r) => ({
+    ...r,
+    unreadCount: unread.get(r.threadId) ?? 0,
   }))
 }

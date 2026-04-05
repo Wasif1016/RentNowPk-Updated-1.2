@@ -6,6 +6,7 @@ import { getRequiredUser } from '@/lib/auth/session'
 import {
   bookingTag,
   customerBookingsTag,
+  unreadMessagesTag,
   vendorBookingsTag,
 } from '@/lib/constants/cache-tags'
 import { db } from '@/lib/db'
@@ -86,6 +87,7 @@ export async function vendorAcceptBooking(
   updateTag(bookingTag(bookingId))
   updateTag(customerBookingsTag(gate.customerUserId))
   updateTag(vendorBookingsTag(user.id))
+  updateTag(unreadMessagesTag(gate.customerUserId))
 
   return { ok: true }
 }
@@ -131,6 +133,7 @@ export async function vendorRejectBooking(
   updateTag(bookingTag(bookingId))
   updateTag(customerBookingsTag(gate.customerUserId))
   updateTag(vendorBookingsTag(user.id))
+  updateTag(unreadMessagesTag(gate.customerUserId))
 
   return { ok: true }
 }

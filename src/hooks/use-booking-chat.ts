@@ -52,7 +52,69 @@ function parseBroadcastRecord(payload: unknown): ChatMessageDto | null {
     senderId,
     content,
     createdAt: created,
+    editedAt: null,
   }
+}
+
+/** Thin wrapper around a Web Audio API generated tone (no asset needed). */
+let _notifyAudio: HTMLAudioElement | null = null
+
+function encodeWav(samples: Float32Array, sampleRate: number): ArrayBuffer {
+  const numChannels = 1
+  const bitsPerSample = 16
+  const bytesPerSample = bitsPerSample / 8
+  const blockAlign = numChannels * bytesPerSample
+  const byteRate = sampleRate * blockAlign
+  const dataSize = samples.length * bytesPerSample
+  const headerSize = 44
+  const buffer = new ArrayBuffer(headerSize + dataSize)
+  const view = new DataView(buffer)
+
+  // RIFF header
+  const writeStr = (offset: number, s: string) => {
+    for (let i = 0; i < s.length; i++) view.setUint8(offset + i, s.charCodeAt(i))
+  }
+  writeStr(0, 'RIFF')
+  view.setUint32(4, 36 + dataSize, true)
+  writeStr(8, 'WAVE')
+  // fmt chunk
+  writeStr(12, 'fmt ')
+  view.setUint32(16, 16, true)
+  view.setUint16(20, 1, true) // PCM
+  view.setUint16(22, numChannels, true)
+  view.setUint32(24, sampleRate, true)
+  view.setUint32(28, byteRate, true)
+  view.setUint16(32, blockAlign, true)
+  view.setUint16(34, bitsPerSample, true)
+  // data chunk
+  writeStr(36, 'data')
+  view.setUint32(40, dataSize, true)
+  // int16 PCM samples
+  let offset = 44
+  for (let i = 0; i < samples.length; i++) {
+    const s = Math.max(-1, Math.min(1, samples[i])) * 0.8
+    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true)
+    offset += 2
+  }
+  return buffer
+}
+
+function getNotifySound(): HTMLAudioElement {
+  if (!_notifyAudio) {
+    const ctx = new AudioContext()
+    const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.12), ctx.sampleRate)
+    const data = buf.getChannelData(0)
+    for (let i = 0; i < data.length; i++) {
+      const t = i / data.length
+      const env = t < 0.1 ? t / 0.1 : t > 0.5 ? (1 - t) / 0.5 : 1
+      data[i] = Math.sin(2 * Math.PI * 440 * (i / ctx.sampleRate)) * env * 0.25
+    }
+    ctx.close()
+    const wav = encodeWav(data, buf.sampleRate)
+    const blob = new Blob([wav], { type: 'audio/wav' })
+    _notifyAudio = new Audio(URL.createObjectURL(blob))
+  }
+  return _notifyAudio
 }
 
 export function useBookingChat(options: {
@@ -60,8 +122,9 @@ export function useBookingChat(options: {
   threadId: string
   initialMessages: ChatMessageDto[]
   initialNextCursor: MessageCursor | null
+  currentUserId: string
 }) {
-  const { bookingId, threadId, initialMessages, initialNextCursor } = options
+  const { bookingId, threadId, initialMessages, initialNextCursor, currentUserId } = options
 
   const [messages, setMessages] = useState<ChatMessageDto[]>(initialMessages)
   const [nextCursor, setNextCursor] = useState<MessageCursor | null>(
@@ -69,9 +132,11 @@ export function useBookingChat(options: {
   )
   const [loadingOlder, setLoadingOlder] = useState(false)
   const idsRef = useRef<Set<string>>(new Set(initialMessages.map((m) => m.id)))
+  const soundPlayedRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     idsRef.current = new Set(initialMessages.map((m) => m.id))
+    soundPlayedRef.current = new Set(initialMessages.map((m) => m.id))
     setMessages(initialMessages)
     setNextCursor(initialNextCursor)
   }, [bookingId, initialMessages, initialNextCursor])
@@ -83,10 +148,12 @@ export function useBookingChat(options: {
     setMessages(incoming)
     setNextCursor(res.nextCursor)
     idsRef.current = new Set(incoming.map((m) => m.id))
+    for (const m of incoming) soundPlayedRef.current.add(m.id)
   }, [bookingId])
 
   const addOptimisticMessage = useCallback((msg: ChatMessageDto) => {
     idsRef.current.add(msg.id)
+    soundPlayedRef.current.add(msg.id)
     setMessages((prev) =>
       [...prev, msg].sort(
         (a, b) =>
@@ -99,6 +166,7 @@ export function useBookingChat(options: {
     (tempId: string, real: ChatMessageDto) => {
       idsRef.current.delete(tempId)
       idsRef.current.add(real.id)
+      soundPlayedRef.current.add(real.id)
       setMessages((prev) =>
         prev
           .map((m) => (m.id === tempId ? real : m))
@@ -114,6 +182,19 @@ export function useBookingChat(options: {
   const removeOptimisticMessage = useCallback((tempId: string) => {
     idsRef.current.delete(tempId)
     setMessages((prev) => prev.filter((m) => m.id !== tempId))
+  }, [])
+
+  /** Optimistically update a message in-place (for edits). */
+  const updateMessage = useCallback((messageId: string, patch: Partial<ChatMessageDto>) => {
+    setMessages((prev) =>
+      prev.map((m) => (m.id === messageId ? { ...m, ...patch } : m))
+    )
+  }, [])
+
+  /** Remove a message optimistically (for delete). */
+  const deleteMessage = useCallback((messageId: string) => {
+    idsRef.current.delete(messageId)
+    setMessages((prev) => prev.filter((m) => m.id !== messageId))
   }, [])
 
   const loadOlder = useCallback(async () => {
@@ -140,6 +221,7 @@ export function useBookingChat(options: {
       })
       for (const m of older) {
         idsRef.current.add(m.id)
+        soundPlayedRef.current.add(m.id)
       }
       setNextCursor(res.nextCursor)
     } finally {
@@ -168,6 +250,21 @@ export function useBookingChat(options: {
       ch.on('broadcast', { event: 'INSERT' }, (payload) => {
         const dto = parseBroadcastRecord(payload)
         if (!dto || dto.threadId !== threadId) return
+        // Play notify sound for inbound (not own) messages, when tab is visible
+        if (
+          dto.senderId !== currentUserId &&
+          !soundPlayedRef.current.has(dto.id) &&
+          document.visibilityState === 'visible'
+        ) {
+          soundPlayedRef.current.add(dto.id)
+          try {
+            getNotifySound().play().catch(() => {
+              /* ignore autoplay block */
+            })
+          } catch {
+            /* ignore */
+          }
+        }
         setMessages((prev) => {
           if (idsRef.current.has(dto.id)) {
             return prev
@@ -202,11 +299,10 @@ export function useBookingChat(options: {
         void supabase.removeChannel(ch)
       }
     }
-  }, [threadId, bookingId, refetchLatest])
+  }, [threadId, bookingId, refetchLatest, currentUserId])
 
   return {
     messages,
-    setMessages,
     nextCursor,
     loadingOlder,
     loadOlder,
@@ -214,5 +310,7 @@ export function useBookingChat(options: {
     addOptimisticMessage,
     replaceOptimisticMessage,
     removeOptimisticMessage,
+    updateMessage,
+    deleteMessage,
   }
 }

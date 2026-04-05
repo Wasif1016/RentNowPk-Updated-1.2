@@ -3,10 +3,15 @@
 import { format } from 'date-fns'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useState } from 'react'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import type { BookingListRow } from '@/lib/db/chat'
+import { formatUnreadBadge } from '@/lib/format/unread'
 import { cn } from '@/lib/utils'
 
-const STATUS_LABEL: Record<BookingListRow['status'], string> = {
+const STATUS_LABELS: Record<BookingListRow['status'], string> = {
   PENDING: 'Pending',
   CONFIRMED: 'Confirmed',
   REJECTED: 'Rejected',
@@ -14,6 +19,8 @@ const STATUS_LABEL: Record<BookingListRow['status'], string> = {
   EXPIRED: 'Expired',
   COMPLETED: 'Completed',
 }
+
+const ALL_STATUSES = Object.keys(STATUS_LABELS) as BookingListRow['status'][]
 
 export function ChatThreadSidebar({
   rows,
@@ -25,6 +32,20 @@ export function ChatThreadSidebar({
   const pathname = usePathname() ?? ''
   const normalizedBase = basePath.replace(/\/$/, '')
 
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<BookingListRow['status'] | 'ALL'>(
+    'ALL'
+  )
+
+  const filtered = rows.filter((row) => {
+    const matchSearch =
+      !search.trim() ||
+      row.vehicleName.toLowerCase().includes(search.toLowerCase().trim())
+    const matchStatus =
+      statusFilter === 'ALL' || row.status === statusFilter
+    return matchSearch && matchStatus
+  })
+
   return (
     <aside className="border-border bg-muted/30 flex w-full max-w-[min(100%,280px)] shrink-0 flex-col border-r">
       <div className="border-border border-b px-3 py-2">
@@ -35,17 +56,47 @@ export function ChatThreadSidebar({
           {rows.length} booking{rows.length === 1 ? '' : 's'}
         </p>
       </div>
+
+      {/* Search + filter bar */}
+      <div className="border-border flex flex-col gap-1 border-b p-2">
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search vehicles…"
+          className="h-7 text-xs"
+          aria-label="Search conversations"
+        />
+        <div className="flex flex-wrap gap-1">
+          <StatusChip
+            label="All"
+            active={statusFilter === 'ALL'}
+            onClick={() => setStatusFilter('ALL')}
+          />
+          {ALL_STATUSES.map((s) => (
+            <StatusChip
+              key={s}
+              label={STATUS_LABELS[s]}
+              active={statusFilter === s}
+              onClick={() => setStatusFilter(statusFilter === s ? 'ALL' : s)}
+            />
+          ))}
+        </div>
+      </div>
+
       <nav className="min-h-0 flex-1 overflow-y-auto">
-        {rows.length === 0 ? (
+        {filtered.length === 0 ? (
           <p className="text-muted-foreground px-3 py-4 text-xs">
-            No conversations yet.
+            {rows.length === 0
+              ? 'No conversations yet.'
+              : 'No matches for this filter.'}
           </p>
         ) : (
           <ul className="flex flex-col gap-0.5 p-1.5">
-            {rows.map((row) => {
+            {filtered.map((row) => {
               const href = `${normalizedBase}/${row.bookingId}`
               const active =
                 pathname === href || pathname.startsWith(`${href}/`)
+              const unreadLabel = formatUnreadBadge(row.unreadCount)
               return (
                 <li key={row.bookingId}>
                   <Link
@@ -57,11 +108,21 @@ export function ChatThreadSidebar({
                         : 'text-muted-foreground'
                     )}
                   >
-                    <span className="text-foreground line-clamp-1 text-sm font-medium">
-                      {row.vehicleName}
+                    <span className="text-foreground flex min-w-0 items-center gap-2 text-sm font-medium">
+                      <span className="line-clamp-1 min-w-0 flex-1">
+                        {row.vehicleName}
+                      </span>
+                      {unreadLabel ? (
+                        <Badge
+                          variant="secondary"
+                          className="shrink-0 tabular-nums"
+                        >
+                          {unreadLabel}
+                        </Badge>
+                      ) : null}
                     </span>
                     <span className="text-[10px]">
-                      {STATUS_LABEL[row.status]} ·{' '}
+                      {STATUS_LABELS[row.status]} ·{' '}
                       {format(row.pickupAt, 'd MMM')}
                     </span>
                   </Link>
@@ -72,5 +133,27 @@ export function ChatThreadSidebar({
         )}
       </nav>
     </aside>
+  )
+}
+
+function StatusChip({
+  label,
+  active,
+  onClick,
+}: {
+  label: string
+  active: boolean
+  onClick: () => void
+}) {
+  return (
+    <Button
+      type="button"
+      variant={active ? 'default' : 'outline'}
+      size="sm"
+      className="h-5 px-1.5 text-[10px]"
+      onClick={onClick}
+    >
+      {label}
+    </Button>
   )
 }

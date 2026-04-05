@@ -2,11 +2,12 @@
 
 import { updateTag } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { eq } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
 import { getRequiredUser } from '@/lib/auth/session'
 import {
   bookingTag,
   customerBookingsTag,
+  unreadMessagesTag,
   vendorBookingsTag,
 } from '@/lib/constants/cache-tags'
 import {
@@ -97,12 +98,118 @@ export async function sendChatMessage(
   updateTag(customerBookingsTag(ctx.customerUserId))
   updateTag(vendorBookingsTag(ctx.vendorUserId))
 
+  const recipientUserId =
+    user.id === ctx.customerUserId ? ctx.vendorUserId : ctx.customerUserId
+  updateTag(unreadMessagesTag(recipientUserId))
+
   const dto: ChatMessageDto = {
     id: inserted.id,
     threadId: inserted.threadId,
     senderId: inserted.senderId,
     content: inserted.content,
     createdAt: inserted.createdAt.toISOString(),
+    editedAt: null,
   }
   return { ok: true, message: dto }
+}
+
+export type EditChatMessageResult =
+  | { ok: true; message: ChatMessageDto }
+  | { ok: false; error: string }
+
+export async function editChatMessage(
+  bookingId: string,
+  messageId: string,
+  rawContent: string
+): Promise<EditChatMessageResult> {
+  const user = await requireCustomerOrVendor()
+  const parsed = ChatMessageContentSchema.safeParse(rawContent)
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? 'Invalid message.' }
+  }
+
+  const ctx = await getChatContextForBooking({ bookingId, userId: user.id })
+  if (!ctx) {
+    return { ok: false, error: 'Chat not found.' }
+  }
+
+  const now = new Date()
+
+  const [updated] = await db
+    .update(messages)
+    .set({ content: parsed.data, editedAt: now })
+    .where(
+      and(
+        eq(messages.id, messageId),
+        eq(messages.threadId, ctx.threadId),
+        eq(messages.senderId, user.id),
+        isNull(messages.deletedAt)
+      )
+    )
+    .returning({
+      id: messages.id,
+      threadId: messages.threadId,
+      senderId: messages.senderId,
+      content: messages.content,
+      createdAt: messages.createdAt,
+      editedAt: messages.editedAt,
+    })
+
+  if (!updated) {
+    return { ok: false, error: 'Message not found or cannot be edited.' }
+  }
+
+  updateTag(bookingTag(bookingId))
+  updateTag(customerBookingsTag(ctx.customerUserId))
+  updateTag(vendorBookingsTag(ctx.vendorUserId))
+
+  return {
+    ok: true,
+    message: {
+      id: updated.id,
+      threadId: updated.threadId,
+      senderId: updated.senderId,
+      content: updated.content,
+      createdAt: updated.createdAt.toISOString(),
+      editedAt: updated.editedAt ? updated.editedAt.toISOString() : null,
+    },
+  }
+}
+
+export type DeleteChatMessageResult =
+  | { ok: true }
+  | { ok: false; error: string }
+
+export async function deleteChatMessage(
+  bookingId: string,
+  messageId: string
+): Promise<DeleteChatMessageResult> {
+  const user = await requireCustomerOrVendor()
+  const ctx = await getChatContextForBooking({ bookingId, userId: user.id })
+  if (!ctx) {
+    return { ok: false, error: 'Chat not found.' }
+  }
+
+  const [updated] = await db
+    .update(messages)
+    .set({ deletedAt: new Date() })
+    .where(
+      and(
+        eq(messages.id, messageId),
+        eq(messages.threadId, ctx.threadId),
+        eq(messages.senderId, user.id),
+        isNull(messages.deletedAt)
+      )
+    )
+    .returning({ id: messages.id })
+
+  if (!updated) {
+    return { ok: false, error: 'Message not found or already deleted.' }
+  }
+
+  updateTag(bookingTag(bookingId))
+  updateTag(customerBookingsTag(ctx.customerUserId))
+  updateTag(vendorBookingsTag(ctx.vendorUserId))
+
+  return { ok: true }
 }

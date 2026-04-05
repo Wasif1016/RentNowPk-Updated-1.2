@@ -32,6 +32,11 @@ export function staticContentTag(key: string) {
   return `static-${key}`
 }
 
+/** Invalidate when a user's unread message totals may change (read/mark, new message). */
+export function unreadMessagesTag(userId: string) {
+  return `unread-messages-${userId}`
+}
+
 export const CACHE_INVALIDATION_MAP = {
   updateVendorProfile: [
     (vendorId: string) => [vendorProfileTag(vendorId), vendorVehiclesTag(vendorId)],
@@ -59,3 +64,4 @@ export type CacheTag =
   | ReturnType<typeof customerBookingsTag>
   | ReturnType<typeof vendorBookingsTag>
   | ReturnType<typeof staticContentTag>
+  | ReturnType<typeof unreadMessagesTag>

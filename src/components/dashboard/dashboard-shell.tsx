@@ -23,6 +23,9 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 
+import { Badge } from "@/components/ui/badge"
+import { formatUnreadBadge } from "@/lib/format/unread"
+
 import { type DashboardNavItem, isDashboardNavActive } from "./dashboard-nav"
 
 export type DashboardShellUser = {
@@ -35,6 +38,8 @@ export type DashboardShellProps = {
   navItems: DashboardNavItem[]
   sidebarUserName: string
   user: DashboardShellUser
+  /** Unread totals keyed by nav `href` (e.g. `/customer/chat`). */
+  navUnreadCounts?: Partial<Record<string, number>>
   children: React.ReactNode
 }
 
@@ -49,6 +54,7 @@ export function DashboardShell({
   navItems,
   sidebarUserName,
   user,
+  navUnreadCounts,
   children,
 }: DashboardShellProps) {
   const pathname = usePathname() ?? ""
@@ -83,6 +89,8 @@ export function DashboardShell({
                 <SidebarMenu>
                   {navItems.map((item) => {
                     const active = isDashboardNavActive(pathname, item.href)
+                    const unread = navUnreadCounts?.[item.href] ?? 0
+                    const unreadLabel = formatUnreadBadge(unread)
                     return (
                       <SidebarMenuItem key={item.href}>
                         <SidebarMenuButton
@@ -90,13 +98,27 @@ export function DashboardShell({
                           isActive={active}
                           tooltip={item.label}
                         >
-                          <Link href={item.href} prefetch>
+                          <Link
+                            href={item.href}
+                            prefetch
+                            className="flex w-full min-w-0 items-center gap-2"
+                          >
                             <HugeiconsIcon
                               icon={item.icon}
                               strokeWidth={2}
                               className="shrink-0"
                             />
-                            <span>{item.label}</span>
+                            <span className="min-w-0 flex-1 truncate">
+                              {item.label}
+                            </span>
+                            {unreadLabel ? (
+                              <Badge
+                                variant="secondary"
+                                className="ml-auto shrink-0 tabular-nums"
+                              >
+                                {unreadLabel}
+                              </Badge>
+                            ) : null}
                           </Link>
                         </SidebarMenuButton>
                       </SidebarMenuItem>

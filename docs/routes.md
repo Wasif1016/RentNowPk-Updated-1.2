@@ -39,6 +39,8 @@ Requires auth + `CUSTOMER` role (`customer/layout.tsx`).
 | `/customer/bookings/[bookingId]/chat`  | Redirects to `/customer/chat/[bookingId]`                            |
 | `/customer/settings`                   | Add when built                                                        |
 
+**Chat read state:** Per-user read cursors live in `chat_thread_participant_read_state` (see [`schema.ts`](../src/lib/db/schema.ts)). Unread counts use inbound messages after `last_read_at`; opening a thread calls `markThreadRead` (debounced). Nav and sidebar badges cap display at **99+**.
+
 ## Vendor — `src/app/vendor/`
 
 Requires auth + `VENDOR` role (`vendor/layout.tsx`).

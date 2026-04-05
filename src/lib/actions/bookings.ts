@@ -3,7 +3,11 @@
 import { updateTag } from 'next/cache'
 import { eq, and } from 'drizzle-orm'
 import { getRequiredUser } from '@/lib/auth/session'
-import { customerBookingsTag, vendorBookingsTag } from '@/lib/constants/cache-tags'
+import {
+  customerBookingsTag,
+  unreadMessagesTag,
+  vendorBookingsTag,
+} from '@/lib/constants/cache-tags'
 import { ensureCustomerProfile } from '@/lib/db/customer-profile'
 import { db } from '@/lib/db'
 import {
@@ -190,6 +194,7 @@ export async function createBookingRequest(
 
   updateTag(customerBookingsTag(user.id))
   updateTag(vendorBookingsTag(row.vendorUserId))
+  updateTag(unreadMessagesTag(row.vendorUserId))
 
   return { success: true }
 }

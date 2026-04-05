@@ -452,6 +452,32 @@ export const messages = pgTable(
   })
 );
 
+/** Per-user read cursor for booking chat threads (unread counts). */
+export const chatThreadParticipantReadState = pgTable(
+  "chat_thread_participant_read_state",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    threadId: uuid("thread_id")
+      .notNull()
+      .references(() => chatThreads.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    lastReadAt: timestamp("last_read_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => ({
+    threadUserUnique: uniqueIndex(
+      "chat_participant_read_thread_user_unique"
+    ).on(t.threadId, t.userId),
+    userIdx: index("chat_participant_read_user_idx").on(t.userId),
+  })
+);
+
 // ============================================================
 // REVIEWS — one per booking (customer → vendor / vehicle)
 // ============================================================
@@ -683,7 +709,22 @@ export const chatThreadsRelations = relations(chatThreads, ({ one, many }) => ({
     references: [bookings.id],
   }),
   messages: many(messages),
+  participantReadStates: many(chatThreadParticipantReadState),
 }));
+
+export const chatThreadParticipantReadStateRelations = relations(
+  chatThreadParticipantReadState,
+  ({ one }) => ({
+    thread: one(chatThreads, {
+      fields: [chatThreadParticipantReadState.threadId],
+      references: [chatThreads.id],
+    }),
+    user: one(users, {
+      fields: [chatThreadParticipantReadState.userId],
+      references: [users.id],
+    }),
+  })
+);
 
 export const messagesRelations = relations(messages, ({ one }) => ({
   thread: one(chatThreads, {
