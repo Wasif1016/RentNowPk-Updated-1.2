@@ -8,7 +8,7 @@ import {
   destroyCloudinaryImage,
   uploadVehicleImage,
 } from '@/lib/cloudinary/server'
-import { vendorVehiclesTag } from '@/lib/constants/cache-tags'
+import { vehiclePublicTag, vendorVehiclesTag } from '@/lib/constants/cache-tags'
 import { db } from '@/lib/db'
 import { vehicleCities, vehicleImages, vehicles } from '@/lib/db/schema'
 import { getVendorProfileByUserId } from '@/lib/db/vendor-profile'
@@ -311,6 +311,7 @@ export async function createVehicle(
   }
 
   updateTag(vendorVehiclesTag(profile.id))
+  if (vehicleId) updateTag(vehiclePublicTag(vehicleId))
   revalidatePath('/vendor/vehicles')
   revalidatePath('/vendor', 'layout')
   redirect('/vendor/vehicles?created=1')

@@ -4,11 +4,14 @@ Route groups in parentheses **do not** appear in the URL.
 
 ## Public — `src/app/(public)/`
 
-| URL            | File                            |
-| -------------- | ------------------------------- |
-| `/`            | `(public)/page.tsx`             |
-| `/search`      | `(public)/search/page.tsx`      |
-| `/for-vendors` | `(public)/for-vendors/page.tsx` |
+| URL                            | File                                          |
+| ------------------------------ | --------------------------------------------- |
+| `/`                            | `(public)/page.tsx`                           |
+| `/search`                      | `(public)/search/page.tsx`                    |
+| `/for-vendors`                 | `(public)/for-vendors/page.tsx`               |
+| `/{vendorSlug}/{vehicleSlug}` | `(public)/[vendorSlug]/[vehicleSlug]/page.tsx` |
+
+Search supports `pickupPlaceId`, `dropoffPlaceId`, `radiusKm` (see [`public-search` validation](../src/lib/validation/public-search.ts)). Public vehicle URLs use `vendor_profiles.public_slug` and `vehicles.slug`.
 
 Uses `(public)/layout.tsx` (marketing header/footer).
 
@@ -16,9 +19,10 @@ Uses `(public)/layout.tsx` (marketing header/footer).
 
 | URL              | File                     | Notes                                        |
 | ---------------- | ------------------------ | -------------------------------------------- |
-| `/auth/login`    | `auth/login/page.tsx`    | Email/password; optional `next` query        |
-| `/auth/signup`   | `auth/signup/page.tsx`   | Vendor registration (Supabase + trigger)     |
-| `/auth/callback` | `auth/callback/route.ts` | PKCE / email-link `code` exchange + redirect |
+| `/auth/login`          | `auth/login/page.tsx`                | Email/password + Google; optional `next` (allowed public + dashboard paths) |
+| `/auth/signup`         | `auth/signup/page.tsx`             | Vendor registration (Supabase + trigger)                                |
+| `/auth/signup-customer`| `auth/signup-customer/page.tsx`    | Customer registration; optional `next`                                    |
+| `/auth/callback`       | `auth/callback/route.ts`            | PKCE / email-link `code` exchange + `next` redirect                         |
 
 Minimal `auth/layout.tsx` (centered card, no marketing chrome).
 
@@ -60,6 +64,8 @@ Requires auth + `ADMIN` role (`admin/layout.tsx`).
 ## Auth redirects
 
 Unauthenticated users are sent to [`/auth/login`](../src/app/auth/login/page.tsx). Missing `public.users` row (e.g. trigger failure): `/auth/login?error=setup_incomplete`.
+
+Post-login `next` and OAuth callback `next` are validated with [`sanitizeNextPath`](../src/lib/auth/safe-next.ts) (dashboard routes, `/`, `/search`, `/for-vendors`, `/auth/*`, and two-segment public vehicle URLs).
 
 `getRequiredUser()` in [`src/lib/auth/session.ts`](../src/lib/auth/session.ts) sends users to the correct home by role:
 

@@ -110,13 +110,13 @@ export function DashboardShell({
           <SidebarRail />
         </Sidebar>
 
-        <SidebarInset className="max-h-svh overflow-hidden">
+        <SidebarInset className="min-h-0 flex-1 overflow-hidden">
           {/* Mobile only: open navigation drawer (sheet). Desktop uses SidebarRail / ⌘/Ctrl+B. */}
           <header className="flex h-14 shrink-0 items-center border-b border-border bg-background px-4 md:hidden">
             <SidebarTrigger className="-ml-1" />
           </header>
 
-          <div className="flex min-h-0 flex-1 flex-col overflow-auto p-6">
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden p-6">
             {children}
           </div>
         </SidebarInset>

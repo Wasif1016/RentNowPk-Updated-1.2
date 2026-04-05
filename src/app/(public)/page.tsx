@@ -11,9 +11,12 @@ export default function Home() {
         Search by city and vehicle type, compare vendors, and request a booking — chat with verified
         partners on RentNowPk.
       </p>
-      <div className="flex gap-4">
+      <div className="flex flex-wrap justify-center gap-4">
         <Button asChild size="lg">
           <Link href="/search">Search vehicles</Link>
+        </Button>
+        <Button asChild variant="outline" size="lg">
+          <Link href="/auth/signup-customer">Create customer account</Link>
         </Button>
         <Button asChild variant="outline" size="lg">
           <Link href="/for-vendors">For vendors</Link>

@@ -2,7 +2,8 @@
 
 import { useActionState, useEffect } from 'react'
 import Link from 'next/link'
-import { loginAction, type LoginActionResult } from '@/lib/actions/auth'
+import { getOAuthSignInUrl, loginAction, type LoginActionResult } from '@/lib/actions/auth'
+import { showToast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
@@ -60,7 +61,7 @@ export function LoginForm({
     <Card>
       <CardHeader>
         <CardTitle>Log in</CardTitle>
-        <CardDescription>Use your vendor email and password.</CardDescription>
+        <CardDescription>Sign in with email or Google.</CardDescription>
       </CardHeader>
       <form action={formAction} noValidate>
         <input type="hidden" name="next" value={nextPath} />
@@ -100,19 +101,49 @@ export function LoginForm({
               />
               {fe.password && <FieldError>{fe.password}</FieldError>}
             </Field>
-            <FieldDescription>
-              Pakistan WhatsApp format for signup: 03XXXXXXXXX or +92XXXXXXXXXX
-            </FieldDescription>
           </FieldGroup>
         </CardContent>
         <CardFooter className="flex flex-col gap-3 border-t pt-6 [.border-t]:pt-4">
           <Button type="submit" className="w-full" disabled={pending}>
             {pending ? 'Signing in…' : 'Sign in'}
           </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            disabled={pending}
+            onClick={async () => {
+              const next = nextPath || '/customer'
+              const r = await getOAuthSignInUrl('google', next)
+              if (r.success && r.data?.url) {
+                window.location.href = r.data.url
+              } else {
+                showToast('Could not start Google sign-in', {
+                  description: !r.success ? r.error : 'Try again.',
+                  type: 'error',
+                })
+              }
+            }}
+          >
+            Continue with Google
+          </Button>
           <p className="text-center text-sm text-muted-foreground">
-            New vendor?{' '}
-            <Link href="/auth/signup" className="text-primary underline-offset-4 hover:underline">
+            New customer?{' '}
+            <Link
+              href={
+                nextPath
+                  ? `/auth/signup-customer?next=${encodeURIComponent(nextPath)}`
+                  : '/auth/signup-customer'
+              }
+              className="text-primary underline-offset-4 hover:underline"
+            >
               Create an account
+            </Link>
+          </p>
+          <p className="text-center text-sm text-muted-foreground">
+            Vendor?{' '}
+            <Link href="/auth/signup" className="text-primary underline-offset-4 hover:underline">
+              List your business
             </Link>
           </p>
         </CardFooter>

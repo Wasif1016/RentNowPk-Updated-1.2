@@ -6,7 +6,11 @@ import { eq } from 'drizzle-orm'
 import { createClient } from '@/lib/supabase/server'
 import { db } from '@/lib/db'
 import { users } from '@/lib/db/schema'
-import { resolveRedirectAfterLogin, type AppRole } from '@/lib/auth/safe-next'
+import {
+  resolveRedirectAfterLogin,
+  sanitizeNextPath,
+  type AppRole,
+} from '@/lib/auth/safe-next'
 import { formString } from '@/lib/form/form-data'
 
 const LoginSchema = z.object({
@@ -103,28 +107,32 @@ function mapLoginError(raw: string): string {
   return 'Could not sign in. Try again.'
 }
 
-export async function logoutAction(): Promise<ActionResult> {
+export async function logoutAction(): Promise<void> {
   const supabase = await createClient()
   const { error } = await supabase.auth.signOut()
 
   if (error) {
-    return { success: false, error: error.message }
+    console.error('signOut', error.message)
   }
 
   redirect('/')
 }
 
-export async function getOAuthSignInUrl(provider: 'google' | 'apple') {
+export async function getOAuthSignInUrl(
+  provider: 'google' | 'apple',
+  nextRaw?: string | null
+) {
   const base = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '')
   if (!base) {
     return { success: false, error: 'App URL is not configured' }
   }
 
+  const next = sanitizeNextPath(nextRaw ?? null, '/customer')
   const supabase = await createClient()
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider,
     options: {
-      redirectTo: `${base}/auth/callback`,
+      redirectTo: `${base}/auth/callback?next=${encodeURIComponent(next)}`,
     },
   })
 

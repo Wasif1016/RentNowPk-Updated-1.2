@@ -18,6 +18,7 @@ declare
   );
   display_name text;
   role_val public.user_role;
+  vendor_slug text;
 begin
   if r in ('CUSTOMER', 'VENDOR', 'ADMIN') then
     role_val := r::public.user_role;
@@ -50,12 +51,25 @@ begin
       raise exception 'VENDOR signup requires business_name and whatsapp_phone in user metadata';
     end if;
 
-    insert into public.vendor_profiles (user_id, business_name, whatsapp_phone, verification_status)
+    vendor_slug := left(
+      trim(both '-' from regexp_replace(
+        lower(regexp_replace(coalesce(business, 'vendor'), '[^a-zA-Z0-9]+', '-', 'g')),
+        '-+', '-', 'g'
+      )),
+      50
+    );
+    if vendor_slug is null or vendor_slug = '' then
+      vendor_slug := 'vendor';
+    end if;
+    vendor_slug := vendor_slug || '-' || substr(replace(new.id::text, '-', ''), 1, 12);
+
+    insert into public.vendor_profiles (user_id, business_name, whatsapp_phone, verification_status, public_slug)
     values (
       new.id,
       business,
       phone,
-      'PENDING_VERIFICATION'::public.vendor_verification_status
+      'PENDING_VERIFICATION'::public.vendor_verification_status,
+      vendor_slug
     )
     on conflict (user_id) do nothing;
   end if;

@@ -138,7 +138,9 @@ function SidebarProvider({
           } as React.CSSProperties
         }
         className={cn(
-          "group/sidebar-wrapper flex min-h-svh w-full has-data-[variant=inset]:bg-sidebar",
+          // Lock to viewport so the document (html/body) does not scroll; only the inset
+          // content area scrolls (see dashboard-shell). min-h-svh allowed growth → double scrollbars. For now hide the scrollbar
+          "group/sidebar-wrapper overflow-hidden flex h-dvh max-h-dvh min-h-0 w-full has-data-[variant=inset]:bg-sidebar",
           className
         )}
         {...props}

@@ -144,6 +144,8 @@ export const vendorProfiles = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
 
     businessName: text("business_name").notNull(),
+    /** URL segment for public vendor + vehicle routes; unique globally. */
+    publicSlug: text("public_slug").notNull().unique(),
     whatsappPhone: text("whatsapp_phone").notNull(),
 
     cnicNumber: text("cnic_number"),

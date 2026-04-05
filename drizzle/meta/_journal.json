@@ -36,6 +36,13 @@
       "when": 1775311988797,
       "tag": "0004_vehicle_make_logo",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1775367402628,
+      "tag": "0005_vendor_public_slug",
+      "breakpoints": true
     }
   ]
 }

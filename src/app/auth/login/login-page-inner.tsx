@@ -7,7 +7,7 @@ export async function LoginPageInner({
   searchParams: Promise<{ next?: string; error?: string }>
 }) {
   const sp = await searchParams
-  const nextPath = sp.next ? sanitizeNextPath(sp.next, '/vendor') : ''
+  const nextPath = sp.next ? sanitizeNextPath(sp.next, '/') : ''
   const errorCode = sp.error ?? null
 
   return <LoginForm nextPath={nextPath} errorCode={errorCode} />
