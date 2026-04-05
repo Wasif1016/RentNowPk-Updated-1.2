@@ -1,6 +1,14 @@
 'use client'
 
-import { useActionState, useEffect, useMemo, useState } from 'react'
+import {
+  startTransition,
+  useActionState,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
+import { GripVertical, ImagePlus, Loader2 } from 'lucide-react'
 import {
   createVehicle,
   type CreateVehicleFieldKey,
@@ -23,12 +31,21 @@ import { VehicleMakeModelYear } from '@/components/vendor/vehicle-make-model-yea
 import { VehiclePickupMap } from '@/components/vendor/vehicle-pickup-map'
 
 const MAX_BYTES = 8 * 1024 * 1024
+const MAX_FILES = 5
 const ACCEPT = 'image/jpeg,image/png,image/webp'
 
 function validateFile(f: File): string | null {
   if (f.size > MAX_BYTES) return 'Each image must be 8 MB or smaller.'
   if (!ACCEPT.split(',').includes(f.type)) return 'Use JPEG, PNG, or WebP.'
   return null
+}
+
+function reorderFiles<T>(list: T[], fromIndex: number, toIndex: number): T[] {
+  if (fromIndex === toIndex) return [...list]
+  const next = [...list]
+  const [removed] = next.splice(fromIndex, 1)
+  next.splice(toIndex, 0, removed)
+  return next
 }
 
 async function createVehicleFormAction(
@@ -45,24 +62,25 @@ function fieldError(
   return fe?.[key]
 }
 
-export function AddVehicleForm() {
+type AddVehicleFormProps = {
+  logoDevPublishableKey?: string
+}
+
+export function AddVehicleForm({ logoDevPublishableKey }: AddVehicleFormProps) {
   const [state, formAction, pending] = useActionState(createVehicleFormAction, null)
 
   const [withDriver, setWithDriver] = useState(true)
   const [selfDrive, setSelfDrive] = useState(true)
 
-  const [cities, setCities] = useState<string[]>([])
-  const [cityDraft, setCityDraft] = useState('')
-
   const [fileList, setFileList] = useState<File[]>([])
   const [coverIndex, setCoverIndex] = useState(0)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const dragFrom = useRef<number | null>(null)
 
   const previewUrls = useMemo(
     () => fileList.map((f) => URL.createObjectURL(f)),
     [fileList]
   )
-
-  const citiesJson = useMemo(() => JSON.stringify(cities), [cities])
 
   useEffect(() => {
     return () => {
@@ -75,53 +93,87 @@ export function AddVehicleForm() {
   const effectiveCoverIndex =
     fileList.length === 0 ? 0 : Math.min(coverIndex, fileList.length - 1)
 
-  const addCity = () => {
-    const t = cityDraft.trim()
-    if (!t) return
-    const lower = t.toLowerCase()
-    if (cities.some((c) => c.toLowerCase() === lower)) {
-      setCityDraft('')
-      return
-    }
-    setCities((c) => [...c, t])
-    setCityDraft('')
+  const mergeIncomingFiles = (incoming: FileList | File[]) => {
+    const arr = Array.from(incoming)
+    setFileList((prev) => {
+      const next = [...prev]
+      for (const f of arr) {
+        if (next.length >= MAX_FILES) {
+          showToast(`You can add at most ${MAX_FILES} photos.`, { type: 'error' })
+          break
+        }
+        const err = validateFile(f)
+        if (err) {
+          showToast(err, { type: 'error' })
+          continue
+        }
+        next.push(f)
+      }
+      return next
+    })
   }
 
-  const removeCity = (idx: number) => {
-    setCities((c) => c.filter((_, i) => i !== idx))
-  }
+  useEffect(() => {
+    setCoverIndex((ci) => Math.min(ci, Math.max(0, fileList.length - 1)))
+  }, [fileList.length])
 
   const onFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const list = e.target.files
-    if (!list?.length) {
-      setFileList([])
-      return
-    }
-    const next: File[] = []
-    for (let i = 0; i < list.length && next.length < 5; i++) {
-      const f = list.item(i)
-      if (!f) continue
-      const err = validateFile(f)
-      if (err) {
-        showToast(err, { type: 'error' })
-        continue
-      }
-      next.push(f)
-    }
-    setFileList(next)
-    setCoverIndex((i) => Math.min(i, Math.max(0, next.length - 1)))
+    if (!list?.length) return
+    mergeIncomingFiles(list)
+    e.target.value = ''
+  }
+
+  const onDropZoneDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const files = e.dataTransfer.files
+    if (files?.length) mergeIncomingFiles(files)
+  }
+
+  const onReorderDrop = (toIndex: number) => {
+    const from = dragFrom.current
+    dragFrom.current = null
+    if (from === null || from === toIndex) return
+    setFileList((prev) => {
+      const next = reorderFiles(prev, from, toIndex)
+      setCoverIndex((ci) => {
+        const coverFile = prev[ci]
+        const ni = next.findIndex((f) => f === coverFile)
+        return ni >= 0 ? ni : 0
+      })
+      return next
+    })
   }
 
   const fe = state?.ok === false ? state.fieldErrors : undefined
   const bannerError = state?.ok === false ? state.message : null
 
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    if (fileList.length === 0) {
+      showToast('Add at least one photo.', { type: 'error' })
+      return
+    }
+    const form = e.currentTarget
+    const fd = new FormData(form)
+    fd.delete('images')
+    for (const f of fileList) {
+      fd.append('images', f)
+    }
+    startTransition(() => {
+      void formAction(fd)
+    })
+  }
+
   return (
+    <>
     <form
-      action={formAction}
-      className="flex max-w-2xl flex-col gap-8"
+      onSubmit={handleSubmit}
+      className="relative flex max-w-2xl flex-col gap-8"
       encType="multipart/form-data"
+      aria-busy={pending}
     >
-      <input type="hidden" name="cities" value={citiesJson} />
       <input type="hidden" name="coverIndex" value={String(effectiveCoverIndex)} />
 
       {withDriver ? <input type="hidden" name="withDriverEnabled" value="on" /> : null}
@@ -151,6 +203,7 @@ export function AddVehicleForm() {
         </Field>
 
         <VehicleMakeModelYear
+          logoDevPublishableKey={logoDevPublishableKey}
           fieldErrors={
             fe
               ? {
@@ -171,7 +224,7 @@ export function AddVehicleForm() {
         }
       />
 
-      <div className="border-border space-y-4 rounded-lg border bg-card p-4">
+      <div className="border-border space-y-4 rounded-xl border bg-card p-4">
         <p className="text-foreground text-sm font-medium">Drive types & pricing</p>
         <FieldDescription>
           Enable at least one option and enter day and month prices (PKR) for each enabled type.
@@ -288,85 +341,85 @@ export function AddVehicleForm() {
         </div>
       </div>
 
-      <div className="space-y-3">
-        <Field data-invalid={!!fieldError(fe, 'cities')}>
-          <FieldLabel>Cities (pickup)</FieldLabel>
-          <FieldDescription>Add one or more cities where this vehicle is available.</FieldDescription>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Input
-              value={cityDraft}
-              onChange={(e) => setCityDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  addCity()
-                }
-              }}
-              placeholder="City name"
-              className="bg-card border-border sm:flex-1"
-              aria-invalid={!!fieldError(fe, 'cities')}
-            />
-            <Button type="button" variant="secondary" onClick={addCity}>
-              Add city
-            </Button>
-          </div>
-          {cities.length > 0 ? (
-            <ul className="flex flex-wrap gap-2 pt-2">
-              {cities.map((c, idx) => (
-                <li
-                  key={`${c}-${idx}`}
-                  className="bg-muted text-muted-foreground inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm"
-                >
-                  {c}
-                  <button
-                    type="button"
-                    className="text-foreground hover:text-destructive underline-offset-2 hover:underline"
-                    onClick={() => removeCity(idx)}
-                  >
-                    Remove
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-          {fieldError(fe, 'cities') ? (
-            <FieldError>{fieldError(fe, 'cities')}</FieldError>
-          ) : null}
-        </Field>
-      </div>
+      <Field data-invalid={!!fieldError(fe, 'images')}>
+        <FieldLabel>Photos</FieldLabel>
+        <FieldDescription>
+          Up to {MAX_FILES} images. The <strong>cover</strong> photo is the one marked below — drag
+          tiles to reorder; the cover is used on listings.
+        </FieldDescription>
 
-      <div className="space-y-3">
-        <Field data-invalid={!!fieldError(fe, 'images')}>
-          <FieldLabel htmlFor="vehicle-images">Photos (1–5)</FieldLabel>
-          <FieldDescription>First photo is the cover until you pick another below.</FieldDescription>
-          <Input
-            id="vehicle-images"
-            name="images"
-            type="file"
-            accept={ACCEPT}
-            multiple
-            required
-            className="bg-card border-border cursor-pointer file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm file:text-foreground"
-            onChange={onFilesChange}
-            aria-invalid={!!fieldError(fe, 'images')}
-          />
-          {fieldError(fe, 'images') ? (
-            <FieldError>{fieldError(fe, 'images')}</FieldError>
-          ) : null}
-        </Field>
+        <input
+          ref={fileInputRef}
+          id="vehicle-images"
+          type="file"
+          accept={ACCEPT}
+          multiple
+          className="sr-only"
+          onChange={onFilesChange}
+          aria-hidden
+        />
+
+        <div
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              fileInputRef.current?.click()
+            }
+          }}
+          onClick={() => fileInputRef.current?.click()}
+          onDragOver={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+          }}
+          onDrop={onDropZoneDrop}
+          className={cn(
+            'border-border bg-muted/30 hover:bg-muted/50 mt-2 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed px-4 py-10 transition-colors',
+            fieldError(fe, 'images') && 'border-destructive'
+          )}
+        >
+          <ImagePlus className="text-muted-foreground size-10" strokeWidth={1.25} />
+          <div className="text-center">
+            <p className="text-foreground text-sm font-medium">Add photos</p>
+            <p className="text-muted-foreground mt-1 text-xs">
+              Click or drop files here · JPEG, PNG, WebP · max {MAX_FILES} files
+            </p>
+          </div>
+          <Button type="button" variant="secondary" size="sm" className="pointer-events-none mt-1">
+            Browse files
+          </Button>
+        </div>
+
+        {fieldError(fe, 'images') ? (
+          <FieldError className="mt-2">{fieldError(fe, 'images')}</FieldError>
+        ) : null}
 
         {fileList.length > 0 ? (
-          <div className="space-y-2">
-            <p className="text-muted-foreground text-sm">Cover photo</p>
-            <div className="flex flex-wrap gap-3">
-              {fileList.map((_, i) => (
-                <button
-                  key={`${previewUrls[i] ?? 'p'}-${i}`}
-                  type="button"
-                  onClick={() => setCoverIndex(i)}
+          <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {fileList.map((file, i) => (
+              <li
+                key={`${file.name}-${file.size}-${file.lastModified}-${i}`}
+                draggable
+                onDragStart={(e) => {
+                  dragFrom.current = i
+                  e.dataTransfer.effectAllowed = 'move'
+                  e.dataTransfer.setData('text/plain', String(i))
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  e.dataTransfer.dropEffect = 'move'
+                }}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  onReorderDrop(i)
+                }}
+                className="group relative"
+              >
+                <div
                   className={cn(
-                    'relative size-20 overflow-hidden rounded-md border border-border bg-muted transition-shadow',
-                    effectiveCoverIndex === i && 'ring-ring ring-2 ring-offset-2 ring-offset-background'
+                    'border-border bg-card relative aspect-4/3 overflow-hidden rounded-xl border shadow-sm transition-shadow',
+                    effectiveCoverIndex === i && 'ring-primary ring-2 ring-offset-2 ring-offset-background'
                   )}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element -- blob previews */}
@@ -375,24 +428,74 @@ export function AddVehicleForm() {
                     alt=""
                     className="size-full object-cover"
                   />
+                  <div className="absolute top-1 left-1 flex items-center gap-0.5 rounded-md bg-black/55 px-1 py-0.5 text-white backdrop-blur-sm">
+                    <GripVertical className="size-3.5 shrink-0 opacity-90" aria-hidden />
+                    <span className="text-[10px] font-medium">{i + 1}</span>
+                  </div>
                   {effectiveCoverIndex === i ? (
-                    <span className="bg-primary/90 text-primary-foreground absolute bottom-1 left-1 rounded px-1 text-[10px] font-medium">
+                    <span className="bg-primary text-primary-foreground absolute bottom-1 right-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold">
                       Cover
                     </span>
                   ) : null}
-                </button>
-              ))}
-            </div>
-            {fieldError(fe, 'coverIndex') ? (
-              <FieldError>{fieldError(fe, 'coverIndex')}</FieldError>
-            ) : null}
-          </div>
+                  <button
+                    type="button"
+                    className="hover:bg-destructive/15 absolute top-1 right-1 rounded-md bg-black/50 px-1.5 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setFileList((prev) => {
+                        const next = prev.filter((_, j) => j !== i)
+                        return next
+                      })
+                      setCoverIndex((ci) => {
+                        if (ci === i) return 0
+                        if (ci > i) return ci - 1
+                        return ci
+                      })
+                    }}
+                  >
+                    Remove
+                  </button>
+                </div>
+                <Button
+                  type="button"
+                  variant={effectiveCoverIndex === i ? 'default' : 'outline'}
+                  size="sm"
+                  className="mt-2 h-8 w-full text-xs"
+                  onClick={() => setCoverIndex(i)}
+                >
+                  {effectiveCoverIndex === i ? 'Cover photo' : 'Set as cover'}
+                </Button>
+              </li>
+            ))}
+          </ul>
         ) : null}
-      </div>
+
+        {fieldError(fe, 'coverIndex') ? (
+          <FieldError className="mt-2">{fieldError(fe, 'coverIndex')}</FieldError>
+        ) : null}
+      </Field>
 
       <Button type="submit" disabled={pending} className="w-full sm:w-auto">
         {pending ? 'Saving…' : 'Save vehicle'}
       </Button>
     </form>
+
+    {pending ? (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-background/75 backdrop-blur-[1px]"
+        role="status"
+        aria-live="polite"
+        aria-label="Saving vehicle"
+      >
+        <div className="border-border bg-card flex flex-col items-center gap-3 rounded-2xl border px-8 py-6 shadow-xl">
+          <Loader2 className="text-primary size-9 animate-spin" aria-hidden />
+          <p className="text-foreground text-sm font-medium">Saving vehicle…</p>
+          <p className="text-muted-foreground max-w-xs text-center text-xs">
+            Uploading photos and creating your listing. Please wait.
+          </p>
+        </div>
+      </div>
+    ) : null}
+    </>
   )
 }

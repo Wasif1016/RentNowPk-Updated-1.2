@@ -13,12 +13,6 @@ const moneyString = z
     return Number.isFinite(n) && n > 0 && n < 1e10
   }, 'Enter a valid amount.')
 
-const cityName = z
-  .string()
-  .trim()
-  .min(1, 'City name is required.')
-  .max(120, 'City name is too long.')
-
 export const createVehicleFieldsSchema = z
   .object({
     name: z.string().trim().min(1, 'Vehicle name is required.').max(200),
@@ -38,21 +32,19 @@ export const createVehicleFieldsSchema = z
     priceSelfDriveDay: z.string().optional(),
     priceSelfDriveMonth: z.string().optional(),
 
-    cities: z.array(cityName).min(1, 'Add at least one city.').max(30),
-
     /** Index of cover image in the submitted files array (0-based); capped in the action. */
     coverIndex: z.coerce.number().int().min(0),
 
     pickupLatitude: z
       .string()
       .trim()
-      .min(1, 'Select a pickup location on the map.')
+      .min(1, 'Set a pickup location.')
       .transform((s) => Number.parseFloat(s))
       .pipe(z.number().finite().min(-90).max(90)),
     pickupLongitude: z
       .string()
       .trim()
-      .min(1, 'Select a pickup location on the map.')
+      .min(1, 'Set a pickup location.')
       .transform((s) => Number.parseFloat(s))
       .pipe(z.number().finite().min(-180).max(180)),
     /** Google Place ID when user picked from search; empty if pin was adjusted manually. */

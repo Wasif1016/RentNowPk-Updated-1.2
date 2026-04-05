@@ -57,11 +57,14 @@ const YEAR_OPTIONS = Array.from(
 
 type Props = {
   fieldErrors?: Partial<Record<FieldKey, string>>
+  /** From server env so make logos work without NEXT_PUBLIC in the client bundle. */
+  logoDevPublishableKey?: string
 }
 
-const LOGO_DEV_PUBLIC = process.env.NEXT_PUBLIC_LOGO_DEV_PUBLISHABLE_KEY
-
-export function VehicleMakeModelYear({ fieldErrors }: Props) {
+export function VehicleMakeModelYear({
+  fieldErrors,
+  logoDevPublishableKey,
+}: Props) {
   const [manualMode, setManualMode] = useState(false)
 
   const [makeStr, setMakeStr] = useState('')
@@ -124,7 +127,7 @@ export function VehicleMakeModelYear({ fieldErrors }: Props) {
       setMakeLogoPreviewUrl(null)
       return
     }
-    const direct = logoDevMakeImageUrl(q, LOGO_DEV_PUBLIC, 256)
+    const direct = logoDevMakeImageUrl(q, logoDevPublishableKey, 256)
     if (direct) {
       setMakeLogoPreviewUrl(direct)
       return
@@ -144,7 +147,7 @@ export function VehicleMakeModelYear({ fieldErrors }: Props) {
       cancelled = true
       window.clearTimeout(t)
     }
-  }, [makeStr])
+  }, [makeStr, logoDevPublishableKey])
 
   const modelDisabled = useMemo(() => {
     if (manualMode) return false
@@ -257,7 +260,7 @@ export function VehicleMakeModelYear({ fieldErrors }: Props) {
                       <CommandEmpty>No make found.</CommandEmpty>
                       <CommandGroup>
                         {makes.map((m) => {
-                          const makeRowLogo = logoDevMakeImageUrl(m.name, LOGO_DEV_PUBLIC, 40)
+                          const makeRowLogo = logoDevMakeImageUrl(m.name, logoDevPublishableKey, 40)
                           return (
                             <CommandItem
                               key={m.id}

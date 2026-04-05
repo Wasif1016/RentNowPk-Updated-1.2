@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { importLibrary, setOptions } from '@googlemaps/js-api-loader'
 import {
   Field,
@@ -8,26 +8,40 @@ import {
   FieldError,
   FieldLabel,
 } from '@/components/ui/field'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 
-/** Default map center (Bahawalnagar, PK) — user should search or move the pin. */
+/** Default map center (Bahawalnagar, PK) */
 const DEFAULT_CENTER = { lat: 29.3956, lng: 71.6832 }
+
+type PickupState = {
+  lat: string
+  lng: string
+  placeId: string
+  formattedAddress: string
+}
 
 type VehiclePickupMapProps = {
   fieldError?: string
   className?: string
 }
 
-/**
- * Google Maps + Places Autocomplete for primary vehicle pickup.
- * Submits hidden fields: pickupLatitude, pickupLongitude, pickupPlaceId, pickupFormattedAddress.
- */
 export function VehiclePickupMap({ fieldError, className }: VehiclePickupMapProps) {
-  const mapDivRef = useRef<HTMLDivElement>(null)
+  const mapDivRef = useRef<HTMLDivElement | null>(null)
+  /** Radix Tabs mount tab panels after selection; ref can be null on first useEffect — drive map init from this. */
+  const [mapHostEl, setMapHostEl] = useState<HTMLDivElement | null>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const mapInstRef = useRef<google.maps.Map | null>(null)
   const markerInstRef = useRef<google.maps.Marker | null>(null)
-  const [pickup, setPickup] = useState({
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null)
+
+  const setMapContainerRef = useCallback((el: HTMLDivElement | null) => {
+    mapDivRef.current = el
+    setMapHostEl(el)
+  }, [])
+
+  const [mode, setMode] = useState<'search' | 'map'>('search')
+  const [pickup, setPickup] = useState<PickupState>({
     lat: '',
     lng: '',
     placeId: '',
@@ -41,42 +55,90 @@ export function VehiclePickupMap({ fieldError, className }: VehiclePickupMapProp
       ? null
       : 'Maps are not configured. Set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY in your environment.'
 
+  const applyPosition = (
+    lat: number,
+    lng: number,
+    placeId: string,
+    formattedAddress: string
+  ) => {
+    setPickup({
+      lat: String(lat),
+      lng: String(lng),
+      placeId,
+      formattedAddress,
+    })
+  }
+
+  /** Search: Places Autocomplete only (no map). */
   useEffect(() => {
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim()
-    if (!apiKey) {
-      return
-    }
-    if (!mapDivRef.current || !searchInputRef.current) return
+    if (!apiKey || mode !== 'search' || configError) return
 
     let cancelled = false
-
-    const applyPosition = (
-      lat: number,
-      lng: number,
-      placeId: string,
-      formattedAddress: string
-    ) => {
-      if (cancelled) return
-      setPickup({
-        lat: String(lat),
-        lng: String(lng),
-        placeId,
-        formattedAddress,
-      })
-    }
-
     setOptions({ key: apiKey, v: 'weekly' })
 
-    Promise.all([
-      importLibrary('maps'),
-      importLibrary('places'),
-      importLibrary('marker'),
-    ])
-      .then(async () => {
-        if (cancelled || !mapDivRef.current || !searchInputRef.current) return
+    importLibrary('places')
+      .then(() => {
+        if (cancelled || !searchInputRef.current) return
 
-        const map = new google.maps.Map(mapDivRef.current, {
-          center: DEFAULT_CENTER,
+        if (autocompleteRef.current) {
+          google.maps.event.clearInstanceListeners(autocompleteRef.current)
+          autocompleteRef.current = null
+        }
+
+        const autocomplete = new google.maps.places.Autocomplete(searchInputRef.current, {
+          fields: ['place_id', 'geometry', 'formatted_address'],
+          types: ['geocode'],
+        })
+        autocompleteRef.current = autocomplete
+
+        autocomplete.addListener('place_changed', () => {
+          const place = autocomplete.getPlace()
+          if (!place.geometry?.location) return
+          const lat = place.geometry.location.lat()
+          const lng = place.geometry.location.lng()
+          applyPosition(
+            lat,
+            lng,
+            place.place_id ?? '',
+            place.formatted_address ?? ''
+          )
+        })
+      })
+      .catch(() => {
+        if (!cancelled) setMapError('Could not load Places search.')
+      })
+
+    return () => {
+      cancelled = true
+      if (autocompleteRef.current) {
+        google.maps.event.clearInstanceListeners(autocompleteRef.current)
+        autocompleteRef.current = null
+      }
+    }
+  }, [mode, configError])
+
+  /** Map: draggable marker only — useLayoutEffect + mapHostEl so we run after Radix mounts the panel. */
+  useLayoutEffect(() => {
+    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim()
+    if (!apiKey || mode !== 'map' || configError || !mapHostEl) return
+
+    let cancelled = false
+    setOptions({ key: apiKey, v: 'weekly' })
+
+    Promise.all([importLibrary('maps'), importLibrary('marker')])
+      .then(() => {
+        if (cancelled || !mapHostEl.isConnected) return
+
+        const lat0 = pickup.lat ? Number.parseFloat(pickup.lat) : DEFAULT_CENTER.lat
+        const lng0 = pickup.lng ? Number.parseFloat(pickup.lng) : DEFAULT_CENTER.lng
+        const center =
+          Number.isFinite(lat0) && Number.isFinite(lng0)
+            ? { lat: lat0, lng: lng0 }
+            : DEFAULT_CENTER
+
+        const map = new google.maps.Map(mapHostEl, {
+          center,
           zoom: 13,
           mapTypeControl: false,
           streetViewControl: false,
@@ -86,45 +148,19 @@ export function VehiclePickupMap({ fieldError, className }: VehiclePickupMapProp
 
         const marker = new google.maps.Marker({
           map,
-          position: DEFAULT_CENTER,
+          position: center,
           draggable: true,
           title: 'Pickup location',
         })
         markerInstRef.current = marker
 
-        applyPosition(
-          DEFAULT_CENTER.lat,
-          DEFAULT_CENTER.lng,
-          '',
-          ''
-        )
-
-        const autocomplete = new google.maps.places.Autocomplete(
-          searchInputRef.current,
-          {
-            fields: ['place_id', 'geometry', 'formatted_address'],
-            types: ['geocode'],
-          }
-        )
-        autocomplete.bindTo('bounds', map)
-
-        autocomplete.addListener('place_changed', () => {
-          const place = autocomplete.getPlace()
-          if (!place.geometry?.location) return
-          const lat = place.geometry.location.lat()
-          const lng = place.geometry.location.lng()
-          map.panTo({ lat, lng })
-          marker.setPosition({ lat, lng })
-          if (place.geometry.viewport) {
-            map.fitBounds(place.geometry.viewport)
-          }
-          applyPosition(
-            lat,
-            lng,
-            place.place_id ?? '',
-            place.formatted_address ?? ''
-          )
+        requestAnimationFrame(() => {
+          if (cancelled) return
+          google.maps.event.trigger(map, 'resize')
+          map.setCenter(center)
         })
+
+        applyPosition(center.lat, center.lng, pickup.placeId, pickup.formattedAddress)
 
         marker.addListener('dragend', () => {
           const pos = marker.getPosition()
@@ -133,9 +169,7 @@ export function VehiclePickupMap({ fieldError, className }: VehiclePickupMapProp
         })
       })
       .catch(() => {
-        if (!cancelled) {
-          setMapError('Could not load Google Maps. Check your API key and billing.')
-        }
+        if (!cancelled) setMapError('Could not load Google Maps.')
       })
 
     return () => {
@@ -147,7 +181,9 @@ export function VehiclePickupMap({ fieldError, className }: VehiclePickupMapProp
       mapInstRef.current = null
       markerInstRef.current = null
     }
-  }, [])
+    // pickup/placeld only for initial center when host mounts; omit pickup from deps to avoid resetting map on drag
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, configError, mapHostEl])
 
   const err = configError ?? mapError ?? fieldError
 
@@ -159,28 +195,60 @@ export function VehiclePickupMap({ fieldError, className }: VehiclePickupMapProp
       <input type="hidden" name="pickupFormattedAddress" value={pickup.formattedAddress} readOnly />
 
       <Field data-invalid={!!err}>
-        <FieldLabel htmlFor="pickup-search">Pickup location</FieldLabel>
+        <FieldLabel>Pickup location</FieldLabel>
         <FieldDescription>
-          Search for an address or place, then fine-tune by dragging the pin. Must be in Pakistan.
+          Choose how to set the pin. We derive the listing city from this location (Pakistan only).
         </FieldDescription>
-        <input
-          id="pickup-search"
-          ref={searchInputRef}
-          type="text"
-          autoComplete="off"
-          placeholder="Search e.g. Model Town, Bahawalnagar"
-          disabled={!!configError}
-          className={cn(
-            'border-input bg-input/30 text-foreground placeholder:text-muted-foreground',
-            'focus-visible:border-ring focus-visible:ring-ring/50 h-9 w-full min-w-0 rounded-md border px-3 py-1 text-base transition-colors outline-none focus-visible:ring-[3px] md:text-sm',
-            'bg-card border-border'
-          )}
-        />
-        <div
-          ref={mapDivRef}
-          className="border-border bg-muted mt-2 h-64 w-full rounded-md border md:h-80"
-          role="presentation"
-        />
+
+        <Tabs
+          value={mode}
+          onValueChange={(v) => setMode(v as 'search' | 'map')}
+          className="mt-3 w-full gap-3"
+        >
+          <TabsList variant="line" className="w-full justify-start">
+            <TabsTrigger value="search" className="flex-1 sm:flex-none">
+              Search address
+            </TabsTrigger>
+            <TabsTrigger value="map" className="flex-1 sm:flex-none">
+              Pin on map
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="search" className="mt-3 space-y-2 outline-none">
+            <input
+              id="pickup-search"
+              ref={searchInputRef}
+              type="text"
+              autoComplete="off"
+              placeholder="e.g. Model Town, Lahore"
+              disabled={!!configError}
+              className={cn(
+                'border-input bg-input/30 text-foreground placeholder:text-muted-foreground',
+                'focus-visible:border-ring focus-visible:ring-ring/50 h-10 w-full min-w-0 rounded-xl border px-3 py-2 text-base transition-colors outline-none focus-visible:ring-[3px] md:text-sm',
+                'bg-card border-border'
+              )}
+            />
+            {pickup.formattedAddress ? (
+              <p className="text-muted-foreground text-xs leading-relaxed">
+                Selected: {pickup.formattedAddress}
+              </p>
+            ) : (
+              <p className="text-muted-foreground text-xs">Pick a suggestion from the list.</p>
+            )}
+          </TabsContent>
+
+          <TabsContent value="map" className="mt-3 outline-none">
+            <div
+              ref={setMapContainerRef}
+              className="border-border bg-muted h-72 min-h-72 w-full rounded-xl border md:h-96"
+              role="presentation"
+            />
+            <p className="text-muted-foreground mt-2 text-xs">
+              Drag the pin to the exact pickup spot. Address will be resolved when you save.
+            </p>
+          </TabsContent>
+        </Tabs>
+
         {err ? <FieldError>{err}</FieldError> : null}
       </Field>
     </div>

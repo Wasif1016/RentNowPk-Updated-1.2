@@ -8,6 +8,28 @@ export type PlaceDetailsResult = {
   lat: number
   lng: number
   formattedAddress: string
+  /** Best-effort city/locality for vehicle_cities (Pakistan). */
+  cityName: string | null
+}
+
+/** Prefer locality, then district, then sublocality. */
+export function extractCityFromAddressComponents(
+  components: Array<{ long_name: string; short_name: string; types: string[] }> | undefined
+): string | null {
+  if (!components?.length) return null
+  const priority = [
+    'locality',
+    'administrative_area_level_2',
+    'sublocality_level_1',
+    'sublocality',
+    'administrative_area_level_3',
+  ]
+  for (const type of priority) {
+    const c = components.find((x) => x.types.includes(type))
+    const t = c?.long_name?.trim()
+    if (t && t.length > 0) return t
+  }
+  return null
 }
 
 const DETAILS_BASE = 'https://maps.googleapis.com/maps/api/place/details/json'
@@ -21,7 +43,7 @@ export async function getPlaceDetails(
   const key = getGoogleMapsServerKey()
   const params = new URLSearchParams({
     place_id: placeId,
-    fields: 'geometry,formatted_address,place_id',
+    fields: 'geometry,formatted_address,place_id,address_components',
     key,
   })
   const res = await fetch(`${DETAILS_BASE}?${params.toString()}`, {
@@ -35,6 +57,11 @@ export async function getPlaceDetails(
       place_id?: string
       formatted_address?: string
       geometry?: { location?: { lat: number; lng: number } }
+      address_components?: Array<{
+        long_name: string
+        short_name: string
+        types: string[]
+      }>
     }
   }
 
@@ -43,11 +70,13 @@ export async function getPlaceDetails(
   }
 
   const loc = data.result.geometry.location
+  const cityName = extractCityFromAddressComponents(data.result.address_components)
   return {
     placeId: data.result.place_id ?? placeId,
     lat: loc.lat,
     lng: loc.lng,
     formattedAddress: data.result.formatted_address ?? '',
+    cityName,
   }
 }
 
@@ -76,6 +105,7 @@ const GEOCODE_BASE = 'https://maps.googleapis.com/maps/api/geocode/json'
 export type ReverseGeocodeResult = {
   formattedAddress: string
   placeId: string | null
+  cityName: string | null
 }
 
 /**
@@ -100,6 +130,11 @@ export async function reverseGeocode(
     results?: Array<{
       formatted_address?: string
       place_id?: string
+      address_components?: Array<{
+        long_name: string
+        short_name: string
+        types: string[]
+      }>
     }>
   }
 
@@ -108,8 +143,10 @@ export async function reverseGeocode(
   }
 
   const first = data.results[0]
+  const cityName = extractCityFromAddressComponents(first.address_components)
   return {
     formattedAddress: first.formatted_address ?? '',
     placeId: first.place_id ?? null,
+    cityName,
   }
 }

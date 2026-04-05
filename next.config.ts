@@ -7,6 +7,10 @@ const nextConfig: NextConfig = {
   // Turbopack filesystem cache — much faster dev restarts on large projects
   experimental: {
     turbopackFileSystemCacheForDev: true,
+    /** Default Server Action body limit is 1 MB; vehicle form allows up to 5×8 MB photos. */
+    serverActions: {
+      bodySizeLimit: "50mb",
+    },
   },
 
   // Forward browser errors to terminal — critical for AI debugging (16.2+)

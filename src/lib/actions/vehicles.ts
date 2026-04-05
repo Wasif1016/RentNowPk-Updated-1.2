@@ -37,7 +37,6 @@ export type CreateVehicleFieldKey =
   | 'priceWithDriverMonth'
   | 'priceSelfDriveDay'
   | 'priceSelfDriveMonth'
-  | 'cities'
   | 'coverIndex'
   | 'images'
   | 'pickupLatitude'
@@ -89,7 +88,6 @@ function zodToFieldErrors(
         head === 'priceWithDriverMonth' ||
         head === 'priceSelfDriveDay' ||
         head === 'priceSelfDriveMonth' ||
-        head === 'cities' ||
         head === 'coverIndex' ||
         head === 'pickupLatitude' ||
         head === 'pickupLongitude' ||
@@ -142,14 +140,6 @@ export async function createVehicle(
     }
   }
 
-  let citiesParsed: unknown
-  const citiesRaw = formString(formData, 'cities')
-  try {
-    citiesParsed = JSON.parse(citiesRaw || '[]')
-  } catch {
-    return { ok: false, message: 'Invalid cities data.', fieldErrors: { cities: 'Invalid cities.' } }
-  }
-
   const raw = {
     name: formString(formData, 'name'),
     make: formString(formData, 'make'),
@@ -161,7 +151,6 @@ export async function createVehicle(
     priceWithDriverMonth: formString(formData, 'priceWithDriverMonth'),
     priceSelfDriveDay: formString(formData, 'priceSelfDriveDay'),
     priceSelfDriveMonth: formString(formData, 'priceSelfDriveMonth'),
-    cities: citiesParsed,
     coverIndex: formString(formData, 'coverIndex'),
     pickupLatitude: formString(formData, 'pickupLatitude'),
     pickupLongitude: formString(formData, 'pickupLongitude'),
@@ -188,15 +177,6 @@ export async function createVehicle(
     }
   }
 
-  const cities = dedupeCities(data.cities)
-  if (cities.length === 0) {
-    return {
-      ok: false,
-      message: 'Add at least one city.',
-      fieldErrors: { cities: 'Add at least one city.' },
-    }
-  }
-
   const baseSlug = slugifyVehicleBase(data.name, data.model, data.year)
 
   const pickupResult = await resolvePickupLocation({
@@ -212,6 +192,18 @@ export async function createVehicle(
     }
   }
   const pickup = pickupResult.pickup
+
+  const cities = dedupeCities(pickup.cityName ? [pickup.cityName] : [])
+  if (cities.length === 0) {
+    return {
+      ok: false,
+      message: 'Could not determine city from pickup. Try a more specific address or another location.',
+      fieldErrors: {
+        pickup:
+          'Could not determine city from this location. Search for a street or area, or move the pin.',
+      },
+    }
+  }
 
   let vehicleId: string | null = null
   const uploadedPublicIds: string[] = []

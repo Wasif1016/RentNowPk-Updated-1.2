@@ -12,6 +12,8 @@ export type ResolvedPickup = {
   lng: number
   placeId: string | null
   formattedAddress: string
+  /** Locality used for vehicle_cities (from Google address components). */
+  cityName: string | null
 }
 
 export type ResolvePickupResult =
@@ -57,6 +59,7 @@ export async function resolvePickupLocation(input: {
           lng: details.lng,
           placeId: details.placeId,
           formattedAddress: details.formattedAddress,
+          cityName: details.cityName,
         },
       }
     }
@@ -75,6 +78,7 @@ export async function resolvePickupLocation(input: {
         lng: clientLng,
         placeId: rev.placeId,
         formattedAddress: rev.formattedAddress,
+        cityName: rev.cityName,
       },
     }
   } catch (e) {
