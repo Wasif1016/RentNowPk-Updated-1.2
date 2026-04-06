@@ -17,14 +17,33 @@ function formatPkDayPrice(decimal: string | null): string | null {
   }).format(n)
 }
 
+type SearchParams = {
+  pickupPlaceId?: string
+  dropoffPlaceId?: string
+  pickupAddress?: string
+  dropoffAddress?: string
+}
+
 export function VehicleResultCard({
   v,
   className,
+  searchParams,
 }: {
   v: PublicVehicleCard
   className?: string
+  searchParams?: SearchParams
 }) {
-  const href = `/${v.vendorSlug}/${v.vehicleSlug}`
+  const params = new URLSearchParams()
+  if (searchParams?.pickupPlaceId) params.set('pickupPlaceId', searchParams.pickupPlaceId)
+  if (searchParams?.dropoffPlaceId) params.set('dropoffPlaceId', searchParams.dropoffPlaceId)
+  if (searchParams?.pickupAddress) params.set('pickupAddress', searchParams.pickupAddress)
+  if (searchParams?.dropoffAddress) params.set('dropoffAddress', searchParams.dropoffAddress)
+
+  const paramString = params.toString()
+  const href = paramString
+    ? `/${v.vendorSlug}/${v.vehicleSlug}?${paramString}`
+    : `/${v.vendorSlug}/${v.vehicleSlug}`
+
   const price = formatPkDayPrice(v.minDayPrice)
 
   return (

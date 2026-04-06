@@ -1,6 +1,7 @@
 'use client'
 
 import { useActionState, useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { importLibrary, setOptions } from '@googlemaps/js-api-loader'
 import { loginAction, type LoginActionResult } from '@/lib/actions/auth'
 import {
@@ -196,11 +197,27 @@ function BookingFormFields({
 
   const [pickupPlaceId, setPickupPlaceId] = useState('')
   const [dropoffPlaceId, setDropoffPlaceId] = useState('')
+  const [pickupAddress, setPickupAddress] = useState('')
+  const [dropoffAddress, setDropoffAddress] = useState('')
   const [state, formAction, pending] = useActionState(bookingAction, null)
   const fe = state && !state.success ? state.fieldErrors : undefined
 
   const [pickupAt, setPickupAt] = useState('')
   const [dropoffAt, setDropoffAt] = useState('')
+
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    const pickupPlaceIdParam = searchParams.get('pickupPlaceId')
+    const dropoffPlaceIdParam = searchParams.get('dropoffPlaceId')
+    const pickupAddressParam = searchParams.get('pickupAddress')
+    const dropoffAddressParam = searchParams.get('dropoffAddress')
+
+    if (pickupPlaceIdParam) setPickupPlaceId(pickupPlaceIdParam)
+    if (dropoffPlaceIdParam) setDropoffPlaceId(dropoffPlaceIdParam)
+    if (pickupAddressParam) setPickupAddress(pickupAddressParam)
+    if (dropoffAddressParam) setDropoffAddress(dropoffAddressParam)
+  }, [searchParams])
 
   useEffect(() => {
     const now = new Date()
@@ -240,11 +257,17 @@ function BookingFormFields({
         const acD = new places.Autocomplete(dropRef.current, opts)
         acP.addListener('place_changed', () => {
           const p = acP.getPlace()
-          if (p?.place_id) setPickupPlaceId(p.place_id)
+          if (p?.place_id) {
+            setPickupPlaceId(p.place_id)
+            setPickupAddress(p.formatted_address || p.name || '')
+          }
         })
         acD.addListener('place_changed', () => {
           const p = acD.getPlace()
-          if (p?.place_id) setDropoffPlaceId(p.place_id)
+          if (p?.place_id) {
+            setDropoffPlaceId(p.place_id)
+            setDropoffAddress(p.formatted_address || p.name || '')
+          }
         })
       })
       .catch(() => {})
@@ -254,17 +277,30 @@ function BookingFormFields({
     }
   }, [apiKey])
 
+  useEffect(() => {
+    if (pickupAddress && pickupRef.current) {
+      pickupRef.current.value = pickupAddress
+    }
+    if (dropoffAddress && dropRef.current) {
+      dropRef.current.value = dropoffAddress
+    }
+  }, [pickupAddress, dropoffAddress])
+
   const driveOptions: { value: 'WITH_DRIVER' | 'SELF_DRIVE'; label: string }[] = []
   if (withDriverEnabled) driveOptions.push({ value: 'WITH_DRIVER', label: 'With driver' })
   if (selfDriveEnabled) driveOptions.push({ value: 'SELF_DRIVE', label: 'Self drive' })
 
   const defaultDrive = driveOptions[0]?.value ?? 'WITH_DRIVER'
 
+  const canSubmit = pickupPlaceId && dropoffPlaceId && pickupAt && dropoffAt
+
   return (
     <form className="space-y-4" action={formAction}>
       <input type="hidden" name="vehicleId" value={vehicleId} />
-      <input type="hidden" name="pickupPlaceId" value={pickupPlaceId} readOnly />
-      <input type="hidden" name="dropoffPlaceId" value={dropoffPlaceId} readOnly />
+      <input type="hidden" name="pickupPlaceId" value={pickupPlaceId} />
+      <input type="hidden" name="dropoffPlaceId" value={dropoffPlaceId} />
+      <input type="hidden" name="pickupAddress" value={pickupAddress} />
+      <input type="hidden" name="dropoffAddress" value={dropoffAddress} />
       <input type="hidden" name="pickupAt" value={pickupAt ? new Date(pickupAt).toISOString() : ''} />
       <input type="hidden" name="dropoffAt" value={dropoffAt ? new Date(dropoffAt).toISOString() : ''} />
 
@@ -282,8 +318,8 @@ function BookingFormFields({
             placeholder="Search pickup"
             className="bg-background"
           />
-          {fe?.pickupPlaceId && (
-            <p className="text-xs text-destructive">{fe.pickupPlaceId}</p>
+          {!pickupPlaceId && apiKey && (
+            <p className="text-xs text-muted-foreground">Select a location from the dropdown</p>
           )}
         </div>
         <div className="space-y-2">
@@ -295,8 +331,8 @@ function BookingFormFields({
             placeholder="Search destination"
             className="bg-background"
           />
-          {fe?.dropoffPlaceId && (
-            <p className="text-xs text-destructive">{fe.dropoffPlaceId}</p>
+          {!dropoffPlaceId && apiKey && (
+            <p className="text-xs text-muted-foreground">Select a location from the dropdown</p>
           )}
         </div>
       </div>
@@ -385,11 +421,14 @@ function BookingFormFields({
         />
       </div>
 
-      <Button type="submit" disabled={pending || driveOptions.length === 0} className="min-w-[160px]">
+      <Button type="submit" disabled={pending || driveOptions.length === 0 || !canSubmit} className="min-w-[160px]">
         {pending ? 'Sending…' : 'Submit booking request'}
       </Button>
       {driveOptions.length === 0 && (
         <p className="text-sm text-muted-foreground">This listing has no drive options enabled.</p>
+      )}
+      {!canSubmit && driveOptions.length > 0 && (
+        <p className="text-sm text-muted-foreground">Please select pickup and drop-off locations</p>
       )}
     </form>
   )

@@ -1,0 +1,112 @@
+[2026-04-06T09:38:50.660Z] --- sendVoiceMessage started (booking: 358fe794-d1ff-4907-a9a7-c02fdcf948b8) ---
+[2026-04-06T09:38:50.660Z] Uploading base64 length: 104759
+[2026-04-06T09:38:52.036Z] [CRITICAL ERROR] sendVoiceMessage: [object Object]
+[2026-04-06T09:40:11.237Z] --- sendVoiceMessage started (booking: 358fe794-d1ff-4907-a9a7-c02fdcf948b8) ---
+[2026-04-06T09:40:11.238Z] Uploading base64 length: 152415
+[2026-04-06T09:40:13.117Z] [CRITICAL ERROR] sendVoiceMessage: [object Object]
+[2026-04-06T09:42:30.630Z] --- sendVoiceMessage started (booking: 358fe794-d1ff-4907-a9a7-c02fdcf948b8) ---
+[2026-04-06T09:42:30.630Z] Uploading base64 length: 153703
+[2026-04-06T09:42:32.442Z] [CRITICAL ERROR] sendVoiceMessage: {
+  "message": "Unsupported source URL: data:audio/webm;codecs=opus;base64,GkXfo59ChoEBQveBAULygQRC84EIQoKEd2VibUKHgQRChYECGFOAZwEAAAAAAcICEU2bdLpNu4tTq4QVSalmU6yBbk27i1OrhBZUrmtTrIGTTbuLU6uEH0O2dVOsgddNu41Tq4QcU7trU6yDAcHw7K0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVSalmoCrXsYMPQkBEiYRF3T/XTYCGQ2hyb21lV0GGQ2hyb21lFlSua7+uvdeBAXPFhwpKJDe/9cWDgQKGhkFfT1BVU2Oik09wdXNIZWFkAQEAAIC7AAAAAADhjbWERzuAAJ+BAWJkgSAfQ7Z1AQAAAAABwQ3ngQCjQ8OBAACA+wN/J1cQgWWgtxiFOBvMFr3h4eHum3f1Hcla+zMbGckIFl96lj983X4/rCnLPIUspAHw8I41ZT8E/AIlvOEiP... (out of 153703)",
+  "name": "Error",
+  "http_code": 400
+}
+[2026-04-06T09:44:04.713Z] --- sendVoiceMessage started (booking: 358fe794-d1ff-4907-a9a7-c02fdcf948b8) ---
+[2026-04-06T09:44:04.714Z] Uploading base64 length: 111199
+[2026-04-06T09:44:07.077Z] Cloudinary upload success: https://res.cloudinary.com/doosborl9/video/upload/v1775468647/rentnowpk/chats/5b67bb30-bf2c-443c-9950-3c546ef36d0e/jqdr6xfpi7kc8cunbswu.webm
+[2026-04-06T09:44:07.077Z] Inserting into database...
+[2026-04-06T09:44:07.491Z] [CRITICAL ERROR] sendVoiceMessage: Failed query: insert into "messages" ("id", "thread_id", "sender_id", "content", "message_type", "media_url", "audio_duration", "blocked_by_contact_rule", "delivered_at", "seen_at", "edited_at", "deleted_at", "created_at") values (default, $1, $2, $3, $4, $5, $6, default, $7, default, default, default, $8) returning "id", "thread_id", "sender_id", "content", "message_type", "media_url", "audio_duration", "created_at", "delivered_at", "seen_at"
+params: 5b67bb30-bf2c-443c-9950-3c546ef36d0e,b164231a-2096-4011-9b39-54ce11b50919,,AUDIO,https://res.cloudinary.com/doosborl9/video/upload/v1775468647/rentnowpk/chats/5b67bb30-bf2c-443c-9950-3c546ef36d0e/jqdr6xfpi7kc8cunbswu.webm,5,2026-04-06T09:44:07.077Z,2026-04-06T09:44:07.077Z
+[2026-04-06T09:44:07.491Z] Error: Failed query: insert into "messages" ("id", "thread_id", "sender_id", "content", "message_type", "media_url", "audio_duration", "blocked_by_contact_rule", "delivered_at", "seen_at", "edited_at", "deleted_at", "created_at") values (default, $1, $2, $3, $4, $5, $6, default, $7, default, default, default, $8) returning "id", "thread_id", "sender_id", "content", "message_type", "media_url", "audio_duration", "created_at", "delivered_at", "seen_at"
+params: 5b67bb30-bf2c-443c-9950-3c546ef36d0e,b164231a-2096-4011-9b39-54ce11b50919,,AUDIO,https://res.cloudinary.com/doosborl9/video/upload/v1775468647/rentnowpk/chats/5b67bb30-bf2c-443c-9950-3c546ef36d0e/jqdr6xfpi7kc8cunbswu.webm,5,2026-04-06T09:44:07.077Z,2026-04-06T09:44:07.077Z
+    at PostgresJsPreparedQuery.queryWithCache (D:\code-projects\updated\RentNowPk-Updated-1.2\.next\dev\server\chunks\ssr\0ukq_drizzle-orm_0~s.-0n._.js:8642:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async D:\code-projects\updated\RentNowPk-Updated-1.2\.next\dev\server\chunks\ssr\0ukq_drizzle-orm_0~s.-0n._.js:8801:26
+    at async sendVoiceMessage (D:\code-projects\updated\RentNowPk-Updated-1.2\.next\dev\server\chunks\ssr\[root-of-the-server]__0e5itsw._.js:1042:28)
+    at async executeActionAndPrepareForRender (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\compiled\next-server\app-page-turbo.runtime.dev.js:64:5248)
+    at async D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\compiled\next-server\app-page-turbo.runtime.dev.js:64:1986
+    at async handleAction (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\compiled\next-server\app-page-turbo.runtime.dev.js:62:25378)
+    at async renderToHTMLOrFlightImpl (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\compiled\next-server\app-page-turbo.runtime.dev.js:69:55630)
+    at async doRender (D:\code-projects\updated\RentNowPk-Updated-1.2\.next\dev\server\chunks\ssr\0ukq_07k0d2y._.js:4033:28)
+    at async AppPageRouteModule.handleResponse (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\compiled\next-server\app-page-turbo.runtime.dev.js:71:63567)
+    at async handleResponse (D:\code-projects\updated\RentNowPk-Updated-1.2\.next\dev\server\chunks\ssr\0ukq_07k0d2y._.js:4308:32)
+    at async Module.handler (D:\code-projects\updated\RentNowPk-Updated-1.2\.next\dev\server\chunks\ssr\0ukq_07k0d2y._.js:4711:20)
+    at async DevServer.renderToResponseWithComponentsImpl (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\server\base-server.js:1454:9)
+    at async DevServer.renderPageComponent (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\server\base-server.js:1506:24)
+    at async DevServer.renderToResponseImpl (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\server\base-server.js:1556:32)
+    at async DevServer.pipeImpl (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\server\base-server.js:1043:25)
+    at async NextNodeServer.handleCatchallRenderRequest (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\server\next-server.js:338:17)
+    at async DevServer.handleRequestImpl (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\server\base-server.js:934:17)
+    at async D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\server\dev\next-dev-server.js:394:20
+    at async Span.traceAsyncFn (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\trace\trace.js:164:20)
+    at async DevServer.handleRequest (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\server\dev\next-dev-server.js:390:24)
+    at async invokeRender (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\server\lib\router-server.js:253:21)
+    at async handleRequest (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\server\lib\router-server.js:452:24)
+    at async requestHandlerImpl (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\server\lib\router-server.js:501:13)
+    at async Server.requestListener (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\server\lib\start-server.js:225:13)
+[2026-04-06T09:46:18.079Z] --- sendVoiceMessage started (booking: 358fe794-d1ff-4907-a9a7-c02fdcf948b8) ---
+[2026-04-06T09:46:18.079Z] Uploading base64 length: 72559
+[2026-04-06T09:46:20.028Z] Cloudinary upload success: https://res.cloudinary.com/doosborl9/video/upload/v1775468780/rentnowpk/chats/5b67bb30-bf2c-443c-9950-3c546ef36d0e/zpycppcuk6caid5y5fef.webm
+[2026-04-06T09:46:20.028Z] Inserting into database...
+[2026-04-06T09:46:20.768Z] [CRITICAL ERROR] sendVoiceMessage: Failed query: insert into "messages" ("id", "thread_id", "sender_id", "content", "message_type", "media_url", "audio_duration", "blocked_by_contact_rule", "delivered_at", "seen_at", "edited_at", "deleted_at", "created_at") values (default, $1, $2, $3, $4, $5, $6, default, $7, default, default, default, $8) returning "id", "thread_id", "sender_id", "content", "message_type", "media_url", "audio_duration", "created_at", "delivered_at", "seen_at"
+params: 5b67bb30-bf2c-443c-9950-3c546ef36d0e,611122ae-99a5-47b7-a2fc-20a3ac2af9c6,,AUDIO,https://res.cloudinary.com/doosborl9/video/upload/v1775468780/rentnowpk/chats/5b67bb30-bf2c-443c-9950-3c546ef36d0e/zpycppcuk6caid5y5fef.webm,3,2026-04-06T09:46:20.028Z,2026-04-06T09:46:20.028Z
+[2026-04-06T09:46:20.771Z] Error: Failed query: insert into "messages" ("id", "thread_id", "sender_id", "content", "message_type", "media_url", "audio_duration", "blocked_by_contact_rule", "delivered_at", "seen_at", "edited_at", "deleted_at", "created_at") values (default, $1, $2, $3, $4, $5, $6, default, $7, default, default, default, $8) returning "id", "thread_id", "sender_id", "content", "message_type", "media_url", "audio_duration", "created_at", "delivered_at", "seen_at"
+params: 5b67bb30-bf2c-443c-9950-3c546ef36d0e,611122ae-99a5-47b7-a2fc-20a3ac2af9c6,,AUDIO,https://res.cloudinary.com/doosborl9/video/upload/v1775468780/rentnowpk/chats/5b67bb30-bf2c-443c-9950-3c546ef36d0e/zpycppcuk6caid5y5fef.webm,3,2026-04-06T09:46:20.028Z,2026-04-06T09:46:20.028Z
+    at PostgresJsPreparedQuery.queryWithCache (D:\code-projects\updated\RentNowPk-Updated-1.2\.next\dev\server\chunks\ssr\0ukq_drizzle-orm_0~s.-0n._.js:8642:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async D:\code-projects\updated\RentNowPk-Updated-1.2\.next\dev\server\chunks\ssr\0ukq_drizzle-orm_0~s.-0n._.js:8801:26
+    at async sendVoiceMessage (D:\code-projects\updated\RentNowPk-Updated-1.2\.next\dev\server\chunks\ssr\[root-of-the-server]__0mgg8e0._.js:1312:28)
+    at async executeActionAndPrepareForRender (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\compiled\next-server\app-page-turbo.runtime.dev.js:64:5248)
+    at async D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\compiled\next-server\app-page-turbo.runtime.dev.js:64:1986
+    at async handleAction (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\compiled\next-server\app-page-turbo.runtime.dev.js:62:25378)
+    at async renderToHTMLOrFlightImpl (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\compiled\next-server\app-page-turbo.runtime.dev.js:69:55630)
+    at async doRender (D:\code-projects\updated\RentNowPk-Updated-1.2\.next\dev\server\chunks\ssr\0ukq_0_j.k45._.js:4033:28)
+    at async AppPageRouteModule.handleResponse (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\compiled\next-server\app-page-turbo.runtime.dev.js:71:63567)
+    at async handleResponse (D:\code-projects\updated\RentNowPk-Updated-1.2\.next\dev\server\chunks\ssr\0ukq_0_j.k45._.js:4308:32)
+    at async Module.handler (D:\code-projects\updated\RentNowPk-Updated-1.2\.next\dev\server\chunks\ssr\0ukq_0_j.k45._.js:4711:20)
+    at async DevServer.renderToResponseWithComponentsImpl (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\server\base-server.js:1454:9)
+    at async DevServer.renderPageComponent (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\server\base-server.js:1506:24)
+    at async DevServer.renderToResponseImpl (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\server\base-server.js:1556:32)
+    at async DevServer.pipeImpl (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\server\base-server.js:1043:25)
+    at async NextNodeServer.handleCatchallRenderRequest (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\server\next-server.js:338:17)
+    at async DevServer.handleRequestImpl (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\server\base-server.js:934:17)
+    at async D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\server\dev\next-dev-server.js:394:20
+    at async Span.traceAsyncFn (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\trace\trace.js:164:20)
+    at async DevServer.handleRequest (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\server\dev\next-dev-server.js:390:24)
+    at async invokeRender (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\server\lib\router-server.js:253:21)
+    at async handleRequest (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\server\lib\router-server.js:452:24)
+    at async requestHandlerImpl (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\server\lib\router-server.js:501:13)
+    at async Server.requestListener (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\server\lib\start-server.js:225:13)
+[2026-04-06T09:47:05.607Z] --- sendVoiceMessage started (booking: 1705a9cd-8267-4d1c-9dd1-bd80c65ede5f) ---
+[2026-04-06T09:47:05.607Z] Uploading base64 length: 135957
+[2026-04-06T09:47:08.807Z] Cloudinary upload success: https://res.cloudinary.com/doosborl9/video/upload/v1775468828/rentnowpk/chats/296f34cd-78d0-40e2-adf1-2e1f8236d9f9/u5kww03vb7tg4xdeosic.ogg
+[2026-04-06T09:47:08.809Z] Inserting into database...
+[2026-04-06T09:47:09.262Z] [CRITICAL ERROR] sendVoiceMessage: Failed query: insert into "messages" ("id", "thread_id", "sender_id", "content", "message_type", "media_url", "audio_duration", "blocked_by_contact_rule", "delivered_at", "seen_at", "edited_at", "deleted_at", "created_at") values (default, $1, $2, $3, $4, $5, $6, default, $7, default, default, default, $8) returning "id", "thread_id", "sender_id", "content", "message_type", "media_url", "audio_duration", "created_at", "delivered_at", "seen_at"
+params: 296f34cd-78d0-40e2-adf1-2e1f8236d9f9,31a3d16c-29bd-474a-a335-c8e2277c3e5d,,AUDIO,https://res.cloudinary.com/doosborl9/video/upload/v1775468828/rentnowpk/chats/296f34cd-78d0-40e2-adf1-2e1f8236d9f9/u5kww03vb7tg4xdeosic.ogg,18,2026-04-06T09:47:08.809Z,2026-04-06T09:47:08.809Z
+[2026-04-06T09:47:09.263Z] Error: Failed query: insert into "messages" ("id", "thread_id", "sender_id", "content", "message_type", "media_url", "audio_duration", "blocked_by_contact_rule", "delivered_at", "seen_at", "edited_at", "deleted_at", "created_at") values (default, $1, $2, $3, $4, $5, $6, default, $7, default, default, default, $8) returning "id", "thread_id", "sender_id", "content", "message_type", "media_url", "audio_duration", "created_at", "delivered_at", "seen_at"
+params: 296f34cd-78d0-40e2-adf1-2e1f8236d9f9,31a3d16c-29bd-474a-a335-c8e2277c3e5d,,AUDIO,https://res.cloudinary.com/doosborl9/video/upload/v1775468828/rentnowpk/chats/296f34cd-78d0-40e2-adf1-2e1f8236d9f9/u5kww03vb7tg4xdeosic.ogg,18,2026-04-06T09:47:08.809Z,2026-04-06T09:47:08.809Z
+    at PostgresJsPreparedQuery.queryWithCache (D:\code-projects\updated\RentNowPk-Updated-1.2\.next\dev\server\chunks\ssr\0ukq_drizzle-orm_0~s.-0n._.js:8642:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async D:\code-projects\updated\RentNowPk-Updated-1.2\.next\dev\server\chunks\ssr\0ukq_drizzle-orm_0~s.-0n._.js:8801:26
+    at async sendVoiceMessage (file:///D:/code-projects/updated/RentNowPk-Updated-1.2/.next/dev/server/chunks/ssr/%5Broot-of-the-server%5D__0e5itsw._.js?id=%5Bproject%5D%2Fupdated%2FRentNowPk-Updated-1.2%2Fsrc%2Flib%2Factions%2Fchat.ts+%5Bapp-rsc%5D+%28ecmascript%29:389:28)
+    at async executeActionAndPrepareForRender (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\compiled\next-server\app-page-turbo.runtime.dev.js:64:5248)
+    at async D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\compiled\next-server\app-page-turbo.runtime.dev.js:64:1986
+    at async handleAction (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\compiled\next-server\app-page-turbo.runtime.dev.js:62:25378)
+    at async renderToHTMLOrFlightImpl (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\compiled\next-server\app-page-turbo.runtime.dev.js:69:55630)
+    at async doRender (D:\code-projects\updated\RentNowPk-Updated-1.2\.next\dev\server\chunks\ssr\0ukq_07k0d2y._.js:4033:28)
+    at async AppPageRouteModule.handleResponse (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\compiled\next-server\app-page-turbo.runtime.dev.js:71:63567)
+    at async handleResponse (D:\code-projects\updated\RentNowPk-Updated-1.2\.next\dev\server\chunks\ssr\0ukq_07k0d2y._.js:4308:32)
+    at async Module.handler (D:\code-projects\updated\RentNowPk-Updated-1.2\.next\dev\server\chunks\ssr\0ukq_07k0d2y._.js:4711:20)
+    at async DevServer.renderToResponseWithComponentsImpl (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\server\base-server.js:1454:9)
+    at async DevServer.renderPageComponent (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\server\base-server.js:1506:24)
+    at async DevServer.renderToResponseImpl (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\server\base-server.js:1556:32)
+    at async DevServer.pipeImpl (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\server\base-server.js:1043:25)
+    at async NextNodeServer.handleCatchallRenderRequest (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\server\next-server.js:338:17)
+    at async DevServer.handleRequestImpl (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\server\base-server.js:934:17)
+    at async D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\server\dev\next-dev-server.js:394:20
+    at async Span.traceAsyncFn (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\trace\trace.js:164:20)
+    at async DevServer.handleRequest (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\server\dev\next-dev-server.js:390:24)
+    at async invokeRender (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\server\lib\router-server.js:253:21)
+    at async handleRequest (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\server\lib\router-server.js:452:24)
+    at async requestHandlerImpl (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\server\lib\router-server.js:501:13)
+    at async Server.requestListener (D:\code-projects\updated\RentNowPk-Updated-1.2\node_modules\next\dist\server\lib\start-server.js:225:13)

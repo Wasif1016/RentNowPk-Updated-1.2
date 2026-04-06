@@ -34,8 +34,10 @@ export async function generateMetadata({
 
 export default async function PublicVehiclePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ vendorSlug: string; vehicleSlug: string }>
+  searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
   const { vendorSlug, vehicleSlug } = await params
   const detail = await getCachedPublicVehicleDetail(vendorSlug, vehicleSlug)
@@ -45,7 +47,15 @@ export default async function PublicVehiclePage({
   const prefill =
     user?.role === 'CUSTOMER' ? await getCustomerBookingPrefill(user.id) : null
 
-  const path = `/${vendorSlug}/${vehicleSlug}`
+  const rawSearch = await searchParams
+  const queryStrings: string[] = []
+  if (rawSearch.pickupPlaceId) queryStrings.push(`pickupPlaceId=${encodeURIComponent(Array.isArray(rawSearch.pickupPlaceId) ? rawSearch.pickupPlaceId[0] : rawSearch.pickupPlaceId)}`)
+  if (rawSearch.dropoffPlaceId) queryStrings.push(`dropoffPlaceId=${encodeURIComponent(Array.isArray(rawSearch.dropoffPlaceId) ? rawSearch.dropoffPlaceId[0] : rawSearch.dropoffPlaceId)}`)
+  if (rawSearch.pickupAddress) queryStrings.push(`pickupAddress=${encodeURIComponent(Array.isArray(rawSearch.pickupAddress) ? rawSearch.pickupAddress[0] : rawSearch.pickupAddress)}`)
+  if (rawSearch.dropoffAddress) queryStrings.push(`dropoffAddress=${encodeURIComponent(Array.isArray(rawSearch.dropoffAddress) ? rawSearch.dropoffAddress[0] : rawSearch.dropoffAddress)}`)
+
+  const queryString = queryStrings.length > 0 ? `?${queryStrings.join('&')}` : ''
+  const path = `/${vendorSlug}/${vehicleSlug}${queryString}`
 
   return (
     <div className="container mx-auto max-w-5xl space-y-10 px-4 py-10">

@@ -1,5 +1,8 @@
 'use server'
 
+import fs from 'node:fs'
+import path from 'node:path'
+
 import { updateTag } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { and, eq, isNull, sql } from 'drizzle-orm'
@@ -20,6 +23,17 @@ import {
 import { db } from '@/lib/db'
 import { bookings, chatThreads, incidents, messages, users } from '@/lib/db/schema'
 import { ChatMessageContentSchema } from '@/lib/validation/chat'
+import { broadcastChatEvent, dtoToBroadcastPayload } from '@/lib/chat/realtime'
+import { v2 as cloudinary } from 'cloudinary'
+
+// Configure cloudinary for server actions
+if (process.env.CLOUDINARY_CLOUD_NAME) {
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+  })
+}
 
 type ContactLeakType = 'PHONE_NUMBER' | 'EMAIL_ADDRESS' | 'SOCIAL_HANDLE'
 
@@ -115,6 +129,7 @@ export async function sendChatMessage(
       senderId: user.id,
       content: parsed.data,
       createdAt: now,
+      deliveredAt: now,
       blockedByContactRule,
     })
     .returning({
@@ -122,6 +137,9 @@ export async function sendChatMessage(
       threadId: messages.threadId,
       senderId: messages.senderId,
       content: messages.content,
+      messageType: messages.messageType,
+      mediaUrl: messages.mediaUrl,
+      audioDuration: messages.audioDuration,
       createdAt: messages.createdAt,
       deliveredAt: messages.deliveredAt,
       seenAt: messages.seenAt,
@@ -154,11 +172,18 @@ export async function sendChatMessage(
     threadId: inserted.threadId,
     senderId: inserted.senderId,
     content: inserted.content,
+    messageType: inserted.messageType as 'TEXT' | 'AUDIO',
+    mediaUrl: inserted.mediaUrl,
+    audioDuration: inserted.audioDuration,
     createdAt: inserted.createdAt.toISOString(),
     editedAt: null,
     deliveredAt: inserted.deliveredAt ? inserted.deliveredAt.toISOString() : null,
     seenAt: inserted.seenAt ? inserted.seenAt.toISOString() : null,
   }
+
+  // Broadcast to realtime channel for immediate UI delivery
+  void broadcastChatEvent(ctx.threadId, 'INSERT', dtoToBroadcastPayload(dto))
+
   return { ok: true, message: dto }
 }
 
@@ -200,6 +225,9 @@ export async function editChatMessage(
       threadId: messages.threadId,
       senderId: messages.senderId,
       content: messages.content,
+      messageType: messages.messageType,
+      mediaUrl: messages.mediaUrl,
+      audioDuration: messages.audioDuration,
       createdAt: messages.createdAt,
       editedAt: messages.editedAt,
     })
@@ -219,6 +247,9 @@ export async function editChatMessage(
       threadId: updated.threadId,
       senderId: updated.senderId,
       content: updated.content,
+      messageType: updated.messageType as 'TEXT' | 'AUDIO',
+      mediaUrl: updated.mediaUrl,
+      audioDuration: updated.audioDuration,
       createdAt: updated.createdAt.toISOString(),
       editedAt: updated.editedAt ? updated.editedAt.toISOString() : null,
       deliveredAt: null,
@@ -300,6 +331,9 @@ export async function adminSendChatMessage(
       threadId: messages.threadId,
       senderId: messages.senderId,
       content: messages.content,
+      messageType: messages.messageType,
+      mediaUrl: messages.mediaUrl,
+      audioDuration: messages.audioDuration,
       createdAt: messages.createdAt,
       deliveredAt: messages.deliveredAt,
       seenAt: messages.seenAt,
@@ -321,10 +355,112 @@ export async function adminSendChatMessage(
     threadId: inserted.threadId,
     senderId: inserted.senderId,
     content: inserted.content,
+    messageType: inserted.messageType as 'TEXT' | 'AUDIO',
+    mediaUrl: inserted.mediaUrl,
+    audioDuration: inserted.audioDuration,
     createdAt: inserted.createdAt.toISOString(),
     editedAt: null,
     deliveredAt: inserted.deliveredAt ? inserted.deliveredAt.toISOString() : null,
     seenAt: inserted.seenAt ? inserted.seenAt.toISOString() : null,
   }
   return { ok: true, message: dto }
+}
+
+export async function sendVoiceMessage(
+  bookingId: string,
+  base64Audio: string,
+  durationSeconds: number
+): Promise<SendChatMessageResult> {
+  const user = await requireCustomerOrVendor()
+  const ctx = await getChatContextForBooking({
+    bookingId,
+    userId: user.id,
+  })
+  if (!ctx) {
+    return { ok: false, error: 'Chat not found.' }
+  }
+
+  try {
+    if (!process.env.CLOUDINARY_CLOUD_NAME) {
+       console.error('[sendVoiceMessage] CLOUDINARY_CLOUD_NAME is missing')
+       return { ok: false, error: 'Cloudinary is not configured.' }
+    }
+
+    // Clean base64 string: Cloudinary rejects data URIs with ";codecs=opus"
+    // e.g. "data:audio/webm;codecs=opus;base64,..." -> "data:audio/webm;base64,..."
+    const cleanedBase64 = base64Audio.replace(/;codecs=[^;,]+/, '')
+
+    // Upload to Cloudinary - use 'auto' to let Cloudinary detect audio/video/raw
+    const folder = `rentnowpk/chats/${ctx.threadId}`
+    const result = await cloudinary.uploader.upload(cleanedBase64, {
+      folder,
+      resource_type: 'auto',
+      overwrite: true,
+    })
+
+    if (!result.secure_url) {
+      throw new Error('Upload failed: No secure_url returned')
+    }
+
+    const now = new Date()
+    const [inserted] = await db
+      .insert(messages)
+      .values({
+        threadId: ctx.threadId,
+        senderId: user.id,
+        content: null,
+        messageType: 'AUDIO',
+        mediaUrl: result.secure_url,
+        audioDuration: Math.round(durationSeconds),
+        createdAt: now,
+        deliveredAt: now,
+      })
+      .returning({
+        id: messages.id,
+        threadId: messages.threadId,
+        senderId: messages.senderId,
+        content: messages.content,
+        messageType: messages.messageType,
+        mediaUrl: messages.mediaUrl,
+        audioDuration: messages.audioDuration,
+        createdAt: messages.createdAt,
+        deliveredAt: messages.deliveredAt,
+        seenAt: messages.seenAt,
+      })
+
+    await db
+      .update(chatThreads)
+      .set({ lastMessageAt: now })
+      .where(eq(chatThreads.id, ctx.threadId))
+
+    updateTag(bookingTag(bookingId))
+    updateTag(customerBookingsTag(ctx.customerUserId))
+    updateTag(vendorBookingsTag(ctx.vendorUserId))
+
+    const recipientUserId =
+      user.id === ctx.customerUserId ? ctx.vendorUserId : ctx.customerUserId
+    updateTag(unreadMessagesTag(recipientUserId))
+
+    const dto: ChatMessageDto = {
+      id: inserted.id,
+      threadId: inserted.threadId,
+      senderId: inserted.senderId,
+      content: inserted.content,
+      messageType: inserted.messageType as 'TEXT' | 'AUDIO',
+      mediaUrl: inserted.mediaUrl,
+      audioDuration: inserted.audioDuration,
+      createdAt: inserted.createdAt.toISOString(),
+      editedAt: null,
+      deliveredAt: inserted.deliveredAt ? inserted.deliveredAt.toISOString() : null,
+      seenAt: inserted.seenAt ? inserted.seenAt.toISOString() : null,
+    }
+
+    // Broadcast to realtime channel for immediate UI delivery
+    void broadcastChatEvent(ctx.threadId, 'INSERT', dtoToBroadcastPayload(dto))
+
+    return { ok: true, message: dto }
+  } catch (err) {
+    console.error('[sendVoiceMessage] Error:', err)
+    return { ok: false, error: 'Failed to send voice message.' }
+  }
 }

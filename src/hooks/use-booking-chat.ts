@@ -29,15 +29,17 @@ function parseBroadcastRecord(payload: unknown): ChatMessageDto | null {
   const id = rec.id
   const threadId = rec.thread_id
   const senderId = rec.sender_id
-  const content = rec.content
+  const content = rec.content as string | null
+  const messageType = (rec.message_type as 'TEXT' | 'AUDIO') || 'TEXT'
+  const mediaUrl = rec.media_url as string | null
+  const audioDuration = typeof rec.audio_duration === 'number' ? rec.audio_duration : null
   const createdAt = rec.created_at
   const deliveredAt = rec.delivered_at
   const seenAt = rec.seen_at
   if (
     typeof id !== 'string' ||
     typeof threadId !== 'string' ||
-    typeof senderId !== 'string' ||
-    typeof content !== 'string'
+    typeof senderId !== 'string'
   ) {
     return null
   }
@@ -65,6 +67,9 @@ function parseBroadcastRecord(payload: unknown): ChatMessageDto | null {
     threadId,
     senderId,
     content,
+    messageType,
+    mediaUrl,
+    audioDuration,
     createdAt: created,
     editedAt: null,
     deliveredAt: delivered,
@@ -143,13 +148,14 @@ export function useBookingChat(options: {
   const { bookingId, threadId, initialMessages, initialNextCursor, currentUserId } = options
 
   const [messages, setMessages] = useState<ChatMessageDto[]>(initialMessages)
-  const [nextCursor, setNextCursor] = useState<MessageCursor | null>(
-    initialNextCursor
-  )
+  const [nextCursor, setNextCursor] = useState<MessageCursor | null>(initialNextCursor)
   const [loadingOlder, setLoadingOlder] = useState(false)
+  const [remoteTyping, setRemoteTyping] = useState(false)
+  
   const idsRef = useRef<Set<string>>(new Set(initialMessages.map((m) => m.id)))
   const soundPlayedRef = useRef<Set<string>>(new Set())
   const channelRef = useRef<RealtimeChannel | null>(null)
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     idsRef.current = new Set(initialMessages.map((m) => m.id))
@@ -173,42 +179,33 @@ export function useBookingChat(options: {
     soundPlayedRef.current.add(msg.id)
     setMessages((prev) =>
       [...prev, msg].sort(
-        (a, b) =>
-          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
       )
     )
   }, [])
 
-  const replaceOptimisticMessage = useCallback(
-    (tempId: string, real: ChatMessageDto) => {
-      idsRef.current.delete(tempId)
-      idsRef.current.add(real.id)
-      soundPlayedRef.current.add(real.id)
-      setMessages((prev) =>
-        prev
-          .map((m) => (m.id === tempId ? real : m))
-          .sort(
-            (a, b) =>
-              new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-          )
-      )
-    },
-    []
-  )
+  const replaceOptimisticMessage = useCallback((tempId: string, real: ChatMessageDto) => {
+    idsRef.current.delete(tempId)
+    idsRef.current.add(real.id)
+    soundPlayedRef.current.add(real.id)
+    setMessages((prev) =>
+      prev
+        .map((m) => (m.id === tempId ? real : m))
+        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+    )
+  }, [])
 
   const removeOptimisticMessage = useCallback((tempId: string) => {
     idsRef.current.delete(tempId)
     setMessages((prev) => prev.filter((m) => m.id !== tempId))
   }, [])
 
-  /** Optimistically update a message in-place (for edits). */
   const updateMessage = useCallback((messageId: string, patch: Partial<ChatMessageDto>) => {
     setMessages((prev) =>
       prev.map((m) => (m.id === messageId ? { ...m, ...patch } : m))
     )
   }, [])
 
-  /** Remove a message optimistically (for delete). */
   const deleteMessage = useCallback((messageId: string) => {
     idsRef.current.delete(messageId)
     setMessages((prev) => prev.filter((m) => m.id !== messageId))
@@ -223,17 +220,14 @@ export function useBookingChat(options: {
       const older = res.messages
       setMessages((prev) => {
         const merged = [...older, ...prev]
-        const seen = new Set<string>()
+        const seenSet = new Set<string>()
         const out: ChatMessageDto[] = []
         for (const m of merged) {
-          if (seen.has(m.id)) continue
-          seen.add(m.id)
+          if (seenSet.has(m.id)) continue
+          seenSet.add(m.id)
           out.push(m)
         }
-        out.sort(
-          (a, b) =>
-            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-        )
+        out.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
         return out
       })
       for (const m of older) {
@@ -246,27 +240,36 @@ export function useBookingChat(options: {
     }
   }, [bookingId, nextCursor, loadingOlder])
 
+  const setTyping = useCallback(
+    (isTyping: boolean) => {
+      const ch = channelRef.current
+      if (!ch) return
+      void ch.send({
+        type: 'broadcast',
+        event: 'TYPING',
+        payload: { userId: currentUserId, isTyping },
+      })
+    },
+    [currentUserId]
+  )
+
   useEffect(() => {
     const supabase = createClient()
     const channelName = chatThreadChannelName(threadId)
     let cancelled = false
 
     void (async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
+      const { data: { session } } = await supabase.auth.getSession()
       await supabase.realtime.setAuth(session?.access_token ?? '')
       if (cancelled) return
 
-      const ch = supabase.channel(channelName, {
-        config: { private: true },
-      })
+      const ch = supabase.channel(channelName, { config: { private: true } })
       channelRef.current = ch
 
       ch.on('broadcast', { event: 'INSERT' }, (payload) => {
         const dto = parseBroadcastRecord(payload)
         if (!dto || dto.threadId !== threadId) return
-        // Play notify sound for inbound (not own) messages, when tab is visible
+        
         if (
           dto.senderId !== currentUserId &&
           !soundPlayedRef.current.has(dto.id) &&
@@ -274,38 +277,54 @@ export function useBookingChat(options: {
         ) {
           soundPlayedRef.current.add(dto.id)
           try {
-            getNotifySound().play().catch(() => {
-              /* ignore autoplay block */
-            })
-          } catch {
-            /* ignore */
-          }
+            getNotifySound().play().catch(() => {})
+          } catch {}
         }
+
         setMessages((prev) => {
-          if (idsRef.current.has(dto.id)) {
-            return prev
-          }
+          if (idsRef.current.has(dto.id)) return prev
+          
           const withoutMatchingOptimistic = prev.filter(
-            (m) =>
-              !(
-                isOptimisticMessageId(m.id) &&
-                m.senderId === dto.senderId &&
-                m.content === dto.content
-              )
+            (m) => !(isOptimisticMessageId(m.id) && m.senderId === dto.senderId && m.content === dto.content)
           )
           idsRef.current.add(dto.id)
           return [...withoutMatchingOptimistic, dto].sort(
-            (a, b) =>
-              new Date(a.createdAt).getTime() -
-              new Date(b.createdAt).getTime()
+            (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
           )
         })
       })
 
-      ch.subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          void refetchLatest()
+      ch.on('broadcast', { event: 'THREAD_READ' }, (payload: any) => {
+        const data = payload.payload?.payload || payload.payload
+        if (!data || data.userId === currentUserId) return
+
+        const at = new Date(data.at).getTime()
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m.senderId === currentUserId && !m.seenAt && new Date(m.createdAt).getTime() <= at) {
+              return { ...m, seenAt: data.at }
+            }
+            return m
+          })
+        )
+      })
+
+      ch.on('broadcast', { event: 'TYPING' }, (payload: any) => {
+        const data = payload.payload
+        if (!data || data.userId === currentUserId) return
+
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
+
+        if (data.isTyping) {
+          setRemoteTyping(true)
+          typingTimeoutRef.current = setTimeout(() => setRemoteTyping(false), 3500)
+        } else {
+          setRemoteTyping(false)
         }
+      })
+
+      ch.subscribe((status) => {
+        if (status === 'SUBSCRIBED') void refetchLatest()
       })
     })()
 
@@ -313,9 +332,7 @@ export function useBookingChat(options: {
       cancelled = true
       const ch = channelRef.current
       channelRef.current = null
-      if (ch) {
-        void supabase.removeChannel(ch)
-      }
+      if (ch) void supabase.removeChannel(ch)
     }
   }, [threadId, bookingId, refetchLatest, currentUserId])
 
@@ -330,5 +347,7 @@ export function useBookingChat(options: {
     removeOptimisticMessage,
     updateMessage,
     deleteMessage,
+    setTyping,
+    remoteTyping,
   }
 }

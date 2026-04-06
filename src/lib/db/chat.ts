@@ -2,6 +2,7 @@ import {
   and,
   desc,
   eq,
+  inArray,
   isNull,
   lt,
   or,
@@ -62,7 +63,10 @@ export type ChatMessageDto = {
   id: string
   threadId: string
   senderId: string
-  content: string
+  content: string | null
+  messageType: 'TEXT' | 'AUDIO'
+  mediaUrl: string | null
+  audioDuration: number | null
   createdAt: string
   editedAt: string | null
   deliveredAt: string | null
@@ -164,6 +168,9 @@ export async function loadMessagesPage(
       threadId: messages.threadId,
       senderId: messages.senderId,
       content: messages.content,
+      messageType: messages.messageType,
+      mediaUrl: messages.mediaUrl,
+      audioDuration: messages.audioDuration,
       createdAt: messages.createdAt,
       editedAt: messages.editedAt,
       deliveredAt: messages.deliveredAt,
@@ -192,6 +199,9 @@ export async function loadMessagesPage(
       threadId: m.threadId,
       senderId: m.senderId,
       content: m.content,
+      messageType: m.messageType as 'TEXT' | 'AUDIO',
+      mediaUrl: m.mediaUrl,
+      audioDuration: m.audioDuration,
       createdAt: m.createdAt.toISOString(),
       editedAt: m.editedAt ? m.editedAt.toISOString() : null,
       deliveredAt: m.deliveredAt ? m.deliveredAt.toISOString() : null,
@@ -207,6 +217,8 @@ export type BookingListRow = {
   status: (typeof bookings.$inferSelect)['status']
   pickupAt: Date
   vehicleName: string
+  otherPartyName: string
+  lastMessagePreview: string | null
   lastMessageAt: Date | null
   unreadCount: number
 }
@@ -222,10 +234,12 @@ export async function listBookingChatsForCustomer(
       pickupAt: bookings.pickupAt,
       vehicleName: vehicles.name,
       lastMessageAt: chatThreads.lastMessageAt,
+      vendorName: bookingVendor.fullName,
     })
     .from(bookings)
     .innerJoin(chatThreads, eq(chatThreads.bookingId, bookings.id))
     .innerJoin(vehicles, eq(vehicles.id, bookings.vehicleId))
+    .innerJoin(bookingVendor, eq(bookingVendor.id, bookings.vendorUserId))
     .where(eq(bookings.customerUserId, customerUserId))
     .orderBy(
       desc(
@@ -233,14 +247,55 @@ export async function listBookingChatsForCustomer(
       )
     )
 
-  const mapped = rows.map((r) => ({
-    bookingId: r.bookingId,
-    threadId: r.threadId,
-    status: r.status,
-    pickupAt: r.pickupAt,
-    vehicleName: r.vehicleName,
-    lastMessageAt: r.lastMessageAt,
-  }))
+  const threadIds = rows.map((r) => r.threadId)
+  const lastMessages = threadIds.length > 0
+    ? await db
+        .select({
+          threadId: messages.threadId,
+          content: messages.content,
+          messageType: messages.messageType,
+        })
+        .from(messages)
+        .where(
+          and(
+            inArray(messages.threadId, threadIds),
+            isNull(messages.deletedAt)
+          )
+        )
+        .orderBy(desc(messages.createdAt), desc(messages.id))
+    : []
+
+  const lastMessageMap = new Map<string, { type: 'TEXT' | 'AUDIO'; content: string | null }>()
+  for (const msg of lastMessages) {
+    if (!lastMessageMap.has(msg.threadId)) {
+      lastMessageMap.set(msg.threadId, {
+        type: msg.messageType as 'TEXT' | 'AUDIO',
+        content: msg.content ?? null,
+      })
+    }
+  }
+
+  const mapped = rows.map((r) => {
+    const last = lastMessageMap.get(r.threadId)
+    let preview: string | null = null
+    if (last) {
+      if (last.type === 'AUDIO') {
+        preview = '🎤 Voice message'
+      } else if (last.content) {
+        preview = last.content.length > 40 ? last.content.slice(0, 40) + '…' : last.content
+      }
+    }
+    return {
+      bookingId: r.bookingId,
+      threadId: r.threadId,
+      status: r.status,
+      pickupAt: r.pickupAt,
+      vehicleName: r.vehicleName,
+      otherPartyName: r.vendorName?.trim() ?? 'Vendor',
+      lastMessagePreview: preview,
+      lastMessageAt: r.lastMessageAt,
+    }
+  })
   const unread = await getUnreadCountsByThreadId(
     customerUserId,
     mapped.map((m) => m.threadId)
@@ -317,10 +372,12 @@ export async function listBookingChatsForVendor(
       pickupAt: bookings.pickupAt,
       vehicleName: vehicles.name,
       lastMessageAt: chatThreads.lastMessageAt,
+      customerName: bookingCustomer.fullName,
     })
     .from(bookings)
     .innerJoin(chatThreads, eq(chatThreads.bookingId, bookings.id))
     .innerJoin(vehicles, eq(vehicles.id, bookings.vehicleId))
+    .innerJoin(bookingCustomer, eq(bookingCustomer.id, bookings.customerUserId))
     .where(eq(bookings.vendorUserId, vendorUserId))
     .orderBy(
       desc(
@@ -328,14 +385,55 @@ export async function listBookingChatsForVendor(
       )
     )
 
-  const mapped = rows.map((r) => ({
-    bookingId: r.bookingId,
-    threadId: r.threadId,
-    status: r.status,
-    pickupAt: r.pickupAt,
-    vehicleName: r.vehicleName,
-    lastMessageAt: r.lastMessageAt,
-  }))
+  const threadIds = rows.map((r) => r.threadId)
+  const lastMessages = threadIds.length > 0
+    ? await db
+        .select({
+          threadId: messages.threadId,
+          content: messages.content,
+          messageType: messages.messageType,
+        })
+        .from(messages)
+        .where(
+          and(
+            inArray(messages.threadId, threadIds),
+            isNull(messages.deletedAt)
+          )
+        )
+        .orderBy(desc(messages.createdAt), desc(messages.id))
+    : []
+
+  const lastMessageMap = new Map<string, { type: 'TEXT' | 'AUDIO'; content: string | null }>()
+  for (const msg of lastMessages) {
+    if (!lastMessageMap.has(msg.threadId)) {
+      lastMessageMap.set(msg.threadId, {
+        type: msg.messageType as 'TEXT' | 'AUDIO',
+        content: msg.content ?? null,
+      })
+    }
+  }
+
+  const mapped = rows.map((r) => {
+    const last = lastMessageMap.get(r.threadId)
+    let preview: string | null = null
+    if (last) {
+      if (last.type === 'AUDIO') {
+        preview = '🎤 Voice message'
+      } else if (last.content) {
+        preview = last.content.length > 40 ? last.content.slice(0, 40) + '…' : last.content
+      }
+    }
+    return {
+      bookingId: r.bookingId,
+      threadId: r.threadId,
+      status: r.status,
+      pickupAt: r.pickupAt,
+      vehicleName: r.vehicleName,
+      otherPartyName: r.customerName?.trim() ?? 'Customer',
+      lastMessagePreview: preview,
+      lastMessageAt: r.lastMessageAt,
+    }
+  })
   const unread = await getUnreadCountsByThreadId(
     vendorUserId,
     mapped.map((m) => m.threadId)

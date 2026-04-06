@@ -8,6 +8,8 @@ export const BookingRequestSchema = z
     vehicleId: uuid,
     pickupPlaceId: placeId,
     dropoffPlaceId: placeId,
+    pickupAddress: z.string().min(1, 'Select a pickup location'),
+    dropoffAddress: z.string().min(1, 'Select a drop-off location'),
     pickupAt: z.string().min(1),
     dropoffAt: z.string().min(1),
     driveType: z.enum(['WITH_DRIVER', 'SELF_DRIVE']),

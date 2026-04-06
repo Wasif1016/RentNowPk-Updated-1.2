@@ -474,7 +474,10 @@ export const messages = pgTable(
       .notNull()
       .references(() => users.id),
 
-    content: text("content").notNull(),
+    content: text("content"),
+    messageType: text("message_type").default("TEXT").notNull(),
+    mediaUrl: text("media_url"),
+    audioDuration: integer("audio_duration"),
 
     blockedByContactRule: boolean("blocked_by_contact_rule")
       .notNull()

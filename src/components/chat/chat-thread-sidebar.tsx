@@ -40,6 +40,7 @@ export function ChatThreadSidebar({
   const filtered = rows.filter((row) => {
     const matchSearch =
       !search.trim() ||
+      row.otherPartyName.toLowerCase().includes(search.toLowerCase().trim()) ||
       row.vehicleName.toLowerCase().includes(search.toLowerCase().trim())
     const matchStatus =
       statusFilter === 'ALL' || row.status === statusFilter
@@ -62,7 +63,7 @@ export function ChatThreadSidebar({
         <Input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search vehicles…"
+          placeholder="Search conversations…"
           className="h-7 text-xs"
           aria-label="Search conversations"
         />
@@ -108,9 +109,9 @@ export function ChatThreadSidebar({
                         : 'text-muted-foreground'
                     )}
                   >
-                    <span className="text-foreground flex min-w-0 items-center gap-2 text-sm font-medium">
-                      <span className="line-clamp-1 min-w-0 flex-1">
-                        {row.vehicleName}
+                    <div className="flex min-w-0 items-center justify-between gap-2">
+                      <span className="text-foreground line-clamp-1 text-sm font-medium">
+                        {row.otherPartyName}
                       </span>
                       {unreadLabel ? (
                         <Badge
@@ -120,11 +121,15 @@ export function ChatThreadSidebar({
                           {unreadLabel}
                         </Badge>
                       ) : null}
-                    </span>
-                    <span className="text-[10px]">
-                      {STATUS_LABELS[row.status]} ·{' '}
-                      {format(row.pickupAt, 'd MMM')}
-                    </span>
+                    </div>
+                    <div className="flex min-w-0 items-center justify-between gap-2">
+                      <span className="text-muted-foreground line-clamp-1 text-[11px]">
+                        {row.lastMessagePreview || 'No messages yet'}
+                      </span>
+                      <span className="text-muted-foreground shrink-0 text-[10px]">
+                        {format(row.lastMessageAt ?? row.pickupAt, 'd MMM')}
+                      </span>
+                    </div>
                   </Link>
                 </li>
               )

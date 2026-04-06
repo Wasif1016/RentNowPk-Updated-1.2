@@ -47,6 +47,8 @@ export async function createBookingRequest(
     vehicleId: formString(formData, 'vehicleId'),
     pickupPlaceId: formString(formData, 'pickupPlaceId'),
     dropoffPlaceId: formString(formData, 'dropoffPlaceId'),
+    pickupAddress: formString(formData, 'pickupAddress'),
+    dropoffAddress: formString(formData, 'dropoffAddress'),
     pickupAt: formString(formData, 'pickupAt'),
     dropoffAt: formString(formData, 'dropoffAt'),
     driveType: formString(formData, 'driveType'),
@@ -98,21 +100,34 @@ export async function createBookingRequest(
     return { success: false, error: 'Self-drive is not offered for this vehicle.' }
   }
 
+  let pickupAddress = parsed.data.pickupAddress
+  let dropoffAddress = parsed.data.dropoffAddress
+  let pickupLat: number | undefined
+  let pickupLng: number | undefined
+  let dropoffLat: number | undefined
+  let dropoffLng: number | undefined
+
   const [pickup, dropoff] = await Promise.all([
     getPlaceDetails(parsed.data.pickupPlaceId),
     getPlaceDetails(parsed.data.dropoffPlaceId),
   ])
 
+  if (pickup) {
+    pickupLat = pickup.lat
+    pickupLng = pickup.lng
+    if (!pickupAddress) pickupAddress = pickup.formattedAddress
+  }
+  if (dropoff) {
+    dropoffLat = dropoff.lat
+    dropoffLng = dropoff.lng
+    if (!dropoffAddress) dropoffAddress = dropoff.formattedAddress
+  }
+
   if (!pickup || !dropoff) {
     return { success: false, error: 'Could not verify pickup or drop-off locations.' }
   }
 
-  const route = await getDrivingRouteSummary(
-    pickup.lat,
-    pickup.lng,
-    dropoff.lat,
-    dropoff.lng
-  )
+  const route = await getDrivingRouteSummary(pickupLat!, pickupLng!, dropoffLat!, dropoffLng!)
 
   const customerProfileId = await ensureCustomerProfile(user.id)
 

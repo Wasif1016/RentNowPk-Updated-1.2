@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { getRequiredUser } from '@/lib/auth/session'
 import { getChatContextForBooking } from '@/lib/db/chat'
 import { upsertLastReadToNow } from '@/lib/db/chat-unread'
+import { broadcastChatEvent } from '@/lib/chat/realtime'
 
 export type MarkThreadReadResult = { ok: true } | { ok: false; error: string }
 
@@ -25,7 +26,14 @@ export async function markThreadRead(bookingId: string): Promise<MarkThreadReadR
     return { ok: false, error: 'Chat not found.' }
   }
 
+  const now = new Date()
   await upsertLastReadToNow(ctx.threadId, user.id)
+
+  // Notify other participant instantly via broadcast
+  void broadcastChatEvent(ctx.threadId, 'THREAD_READ', {
+    userId: user.id,
+    at: now.toISOString(),
+  })
 
   revalidatePath('/customer', 'layout')
   revalidatePath('/vendor', 'layout')

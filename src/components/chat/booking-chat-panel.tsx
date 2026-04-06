@@ -1,22 +1,25 @@
 'use client'
 
 import { format, isSameDay } from 'date-fns'
-import { Check, CheckCheck, MapPin } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   vendorAcceptBooking,
   vendorRejectBooking,
 } from '@/lib/actions/booking-vendor-response'
 import { markThreadRead } from '@/lib/actions/chat-read'
-import { deleteChatMessage, editChatMessage, sendChatMessage } from '@/lib/actions/chat'
+import { deleteChatMessage, editChatMessage, sendChatMessage, sendVoiceMessage } from '@/lib/actions/chat'
 import { createOfferFromChat } from '@/lib/actions/booking-offers'
 import { OfferDialog } from '@/components/chat/offer-dialog'
 import {
   useBookingChat,
   isOptimisticMessageId,
 } from '@/hooks/use-booking-chat'
+import { useAudioRecorder } from '@/hooks/use-audio-recorder'
+import { VoiceMessage } from '@/components/chat/voice-message'
+import { Mic, Square, X, SendHorizontal, Check, CheckCheck, MapPin } from 'lucide-react'
+import { toast } from 'sonner'
 import type { bookings } from '@/lib/db/schema'
 import type { ChatMessageDto, MessageCursor } from '@/lib/db/chat'
 import { Button } from '@/components/ui/button'
@@ -93,6 +96,8 @@ export function BookingChatPanel({
     removeOptimisticMessage,
     updateMessage,
     deleteMessage,
+    setTyping,
+    remoteTyping,
   } = useBookingChat({
     bookingId,
     threadId,
@@ -102,6 +107,21 @@ export function BookingChatPanel({
   })
 
   const [draft, setDraft] = useState('')
+  const typingRef = useRef<boolean>(false)
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleDraftChange = (val: string) => {
+    setDraft(val)
+    if (!typingRef.current) {
+      typingRef.current = true
+      setTyping(true)
+    }
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current)
+    typingTimerRef.current = setTimeout(() => {
+      typingRef.current = false
+      setTyping(false)
+    }, 2500)
+  }
   const [error, setError] = useState<string | null>(null)
   const [rejectOpen, setRejectOpen] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
@@ -119,6 +139,25 @@ export function BookingChatPanel({
   // --- Delete confirm state ---
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
+
+  // --- Voice state ---
+  const recorder = useAudioRecorder()
+  const [isSendingVoice, setIsSendingVoice] = useState(false)
+
+  // --- Scrolling ---
+  const bottomRef = useRef<HTMLDivElement>(null)
+  const isAtBottomRef = useRef(true)
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    bottomRef.current?.scrollIntoView({ behavior })
+  }, [])
+
+  // Auto-scroll on new messages
+  useEffect(() => {
+    if (isAtBottomRef.current) {
+      scrollToBottom('smooth')
+    }
+  }, [messages, scrollToBottom])
 
   useEffect(() => {
     let cancelled = false
@@ -149,7 +188,80 @@ export function BookingChatPanel({
   const showVendorPendingActions =
     isVendor && bookingStatus === 'PENDING'
 
-  async function handleSend() {
+  const handleSendVoice = async () => {
+    try {
+      const { blob, duration } = await recorder.stopRecording()
+      if (duration < 1) {
+        toast.error('Recording too short')
+        return
+      }
+
+      setIsSendingVoice(true)
+      
+      // 1. Create a local URL for the optimistic UI
+      const localUrl = URL.createObjectURL(blob)
+      const tempId = `temp-voice-${crypto.randomUUID()}`
+      
+      const optimistic: ChatMessageDto = {
+        id: tempId,
+        threadId,
+        senderId: currentUserId,
+        content: null,
+        createdAt: new Date().toISOString(),
+        editedAt: null,
+        deliveredAt: null,
+        seenAt: null,
+        messageType: 'AUDIO',
+        mediaUrl: localUrl,
+        audioDuration: Math.round(duration),
+      }
+      
+      addOptimisticMessage(optimistic)
+
+      // 2. Convert blob to base64 for server action
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.readAsDataURL(blob)
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = reject
+      })
+
+      // 3. Send to server
+      const res = await sendVoiceMessage(bookingId, base64, duration)
+      
+      if (!res.ok) {
+        removeOptimisticMessage(tempId)
+        toast.error(res.error)
+      } else {
+        replaceOptimisticMessage(tempId, res.message)
+      }
+      
+      URL.revokeObjectURL(localUrl)
+    } catch (err) {
+      console.error('[handleSendVoice] Error:', err)
+      toast.error('Failed to send voice message')
+    } finally {
+      setIsSendingVoice(false)
+    }
+  }
+
+  // Keyboard support for recording
+  useEffect(() => {
+    if (recorder.status !== 'recording') return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        void handleSendVoice()
+      } else if (e.key === 'Escape') {
+        e.preventDefault()
+        recorder.cancelRecording()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [recorder.status, handleSendVoice, recorder.cancelRecording])
+
+  async function handleSendMessage() {
     const text = draft.trim()
     if (!text) return
     setError(null)
@@ -164,6 +276,9 @@ export function BookingChatPanel({
       editedAt: null,
       deliveredAt: null,
       seenAt: null,
+      messageType: 'TEXT',
+      mediaUrl: null,
+      audioDuration: null,
     }
     addOptimisticMessage(optimistic)
     setDraft('')
@@ -212,7 +327,7 @@ export function BookingChatPanel({
 
   function startEdit(msg: ChatMessageDto) {
     setEditingMessageId(msg.id)
-    setEditDraft(msg.content)
+    setEditDraft(msg.content || '')
     setEditError(null)
   }
 
@@ -248,47 +363,6 @@ export function BookingChatPanel({
     } finally {
       setDeleteLoading(false)
     }
-  }
-
-  async function handleShareLocation() {
-    if (!navigator.geolocation) {
-      setError('Location is not supported by your browser.')
-      return
-    }
-    setError(null)
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords
-        const mapsUrl = `https://www.google.com/maps?q=${latitude},${longitude}`
-        void handleSendLocationMessage(mapsUrl)
-      },
-      () => {
-        setError('Could not get your location. Please check your browser permissions.')
-      }
-    )
-  }
-
-  async function handleSendLocationMessage(mapsUrl: string) {
-    const tempId = `temp-${crypto.randomUUID()}`
-    const optimistic: ChatMessageDto = {
-      id: tempId,
-      threadId,
-      senderId: currentUserId,
-      content: mapsUrl,
-      createdAt: new Date().toISOString(),
-      editedAt: null,
-      deliveredAt: null,
-      seenAt: null,
-    }
-    addOptimisticMessage(optimistic)
-    setDraft('')
-    const res = await sendChatMessage(bookingId, mapsUrl)
-    if (!res.ok) {
-      removeOptimisticMessage(tempId)
-      setError(res.error)
-      return
-    }
-    replaceOptimisticMessage(tempId, res.message)
   }
 
   async function handleOfferSubmit(values: {
@@ -333,15 +407,6 @@ export function BookingChatPanel({
               <h1 className="text-foreground text-lg font-semibold">{title}</h1>
               <p className="text-muted-foreground text-sm">{subtitle}</p>
             </div>
-            {isVendor && bookingStatus === 'CONFIRMED' && (
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => setOfferOpen(true)}
-              >
-                Send Offer
-              </Button>
-            )}
           </div>
         </div>
       </header>
@@ -397,8 +462,17 @@ export function BookingChatPanel({
             onStartEdit: startEdit,
             onDeleteRequest: (id) => setDeleteConfirmId(id),
           })}
+          <div ref={bottomRef} />
         </div>
       </ScrollArea>
+
+      {remoteTyping && (
+        <div className="px-4 py-1">
+          <p className="text-muted-foreground animate-pulse text-[10px] italic">
+            The other party is typing...
+          </p>
+        </div>
+      )}
 
       {error ? (
         <p className="text-destructive shrink-0 px-4 pb-1 text-sm" role="alert">
@@ -408,39 +482,89 @@ export function BookingChatPanel({
 
       <footer className="border-border shrink-0 border-t p-3">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-          <Textarea
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder="Type a message…"
-            rows={2}
-            className="min-h-0 flex-1"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                void handleSend()
-              }
-            }}
-          />
-          {bookingStatus === 'CONFIRMED' && (
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className="shrink-0"
-              onClick={() => void handleShareLocation()}
-              title="Share current location"
-            >
-              <MapPin className="h-4 w-4" />
-            </Button>
+          {recorder.status === 'recording' ? (
+            <div className="bg-muted flex flex-1 items-center gap-3 rounded-lg px-3 py-2">
+              <div className="flex h-2 w-2 animate-pulse rounded-full bg-red-500" />
+              <span className="text-xs font-medium tabular-nums">
+                Recording: {Math.floor(recorder.duration / 60)}:{(recorder.duration % 60).toString().padStart(2, '0')}
+              </span>
+              <div className="flex-1" />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                onClick={recorder.cancelRecording}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="default"
+                size="icon"
+                className="h-8 w-8 rounded-full"
+                onClick={handleSendVoice}
+                disabled={isSendingVoice}
+              >
+                <SendHorizontal className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : (
+            <>
+              <div className="relative flex-1">
+                <Textarea
+                  value={draft}
+                  onChange={(e) => handleDraftChange(e.target.value)}
+                  placeholder="Type a message…"
+                  disabled={isSendingVoice}
+                  rows={2}
+                  className="min-h-[44px] flex-1 resize-none pr-10"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      handleSendMessage()
+                    }
+                  }}
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={cn(
+                    "absolute bottom-1 right-1 h-8 w-8 text-muted-foreground transition-colors hover:text-primary",
+                    draft.trim() ? "text-primary" : ""
+                  )}
+                  onClick={handleSendMessage}
+                  disabled={!draft.trim() || isSendingVoice}
+                >
+                  <SendHorizontal className="h-4 w-4" />
+                </Button>
+              </div>
+
+              <div className="flex shrink-0 gap-2">
+                {isVendor && bookingStatus === 'CONFIRMED' && (
+                  <Button
+                    variant="outline"
+                    className="flex-1 sm:flex-none"
+                    onClick={() => setOfferOpen(true)}
+                  >
+                    Send Offer
+                  </Button>
+                )}
+                
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className={cn(
+                    "h-[44px] w-[44px] rounded-lg border-2 transition-all duration-300",
+                    isSendingVoice ? "animate-pulse" : ""
+                  )}
+                  onClick={() => recorder.startRecording()}
+                  disabled={isSendingVoice}
+                  title="Record voice message"
+                >
+                  <Mic className="h-5 w-5" />
+                </Button>
+              </div>
+            </>
           )}
-          <Button
-            type="button"
-            onClick={() => void handleSend()}
-            disabled={!draft.trim()}
-            className="shrink-0"
-          >
-            Send
-          </Button>
         </div>
       </footer>
 
@@ -575,8 +699,6 @@ function MessageBubbleItem({
   onStartEdit,
   onDeleteRequest,
 }: BubbleProps) {
-  const time = format(new Date(message.createdAt), 'MMM d, h:mm a')
-
   if (editing) {
     return (
       <div
@@ -618,8 +740,6 @@ function MessageBubbleItem({
     )
   }
 
-  const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥']
-
   return (
     <div
       className={cn(
@@ -637,7 +757,38 @@ function MessageBubbleItem({
             pending && 'opacity-80'
           )}
         >
-          {message.content}
+          <div className="flex flex-col gap-1">
+            {message.messageType === 'AUDIO' ? (
+              <VoiceMessage 
+                url={message.mediaUrl || ''} 
+                duration={message.audioDuration || 0} 
+                isOwn={isOwn} 
+              />
+            ) : (
+              <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
+                {message.content}
+              </p>
+            )}
+            <div
+              className={cn(
+                'flex items-center gap-1.5 opacity-50',
+                isOwn ? 'justify-end' : 'justify-start'
+              )}
+            >
+              <span className="text-[10px] tabular-nums">
+                {format(new Date(message.createdAt), 'h:mm a')}
+              </span>
+              {isOwn && (
+                <span className="flex items-center gap-0.5">
+                  {message.seenAt ? (
+                    <CheckCheck className="text-primary h-3 w-3 shrink-0" aria-label="Seen" />
+                  ) : message.deliveredAt ? (
+                    <Check className="text-muted-foreground h-3 w-3 shrink-0" aria-label="Delivered" />
+                  ) : null}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
 
         {isOwn ? (
@@ -648,18 +799,6 @@ function MessageBubbleItem({
           />
         ) : null}
       </div>
-
-      <span className="text-muted-foreground flex items-center gap-0.5 px-1 text-[10px]">
-        {!isOwn && message.seenAt ? (
-          <CheckCheck className="text-primary h-3 w-3 shrink-0" aria-label="Seen" />
-        ) : !isOwn ? (
-          <Check className="text-muted-foreground h-3 w-3 shrink-0" aria-label="Delivered" />
-        ) : null}
-        <span>{time}</span>
-        {message.editedAt ? (
-          <span className="ml-1 italic">(edited)</span>
-        ) : null}
-      </span>
     </div>
   )
 }

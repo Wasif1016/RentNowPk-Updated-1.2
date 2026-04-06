@@ -132,7 +132,15 @@ export default async function SearchPage({
           <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {vehicles.map((v) => (
               <li key={v.vehicleId}>
-                <VehicleResultCard v={v} />
+                <VehicleResultCard
+                  v={v}
+                  searchParams={{
+                    pickupPlaceId: pickupPlaceId ?? undefined,
+                    dropoffPlaceId: dropoffPlaceId ?? undefined,
+                    pickupAddress: pickup.formattedAddress,
+                    dropoffAddress: dropoff.formattedAddress,
+                  }}
+                />
               </li>
             ))}
           </ul>
