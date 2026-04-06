@@ -39,6 +39,7 @@ export const ADMIN_NAV: DashboardNavItem[] = [
   { href: "/admin", label: "Dashboard", icon: DashboardSquare01Icon },
   { href: "/admin/vendors", label: "Vendors", icon: UserGroupIcon },
   { href: "/admin/bookings", label: "Bookings", icon: Calendar03Icon },
+  { href: "/admin/chat", label: "Messages", icon: Chat01Icon },
   { href: "/admin/settings", label: "Settings", icon: Settings01Icon },
 ]
 

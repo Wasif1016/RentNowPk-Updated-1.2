@@ -25,7 +25,7 @@ import { getUnreadCountsByThreadId, getTotalUnreadForUser } from '@/lib/db/chat-
  */
 export async function getAdminChatContextForBooking(options: {
   bookingId: string
-}): Promise<BookingChatContext | null> {
+}): Promise<AdminChatContext | null> {
   const [row] = await db
     .select({
       threadId: chatThreads.id,
@@ -52,11 +52,22 @@ export async function getAdminChatContextForBooking(options: {
     bookingId: row.bookingId,
     status: row.status,
     vehicleName: row.vehicleName,
-    otherPartyName: row.customerName, // admin doesn't have a "other party"
-    isCustomer: false,
     customerUserId: row.customerUserId,
     vendorUserId: row.vendorUserId,
+    customerName: row.customerName ?? 'Customer',
+    vendorName: row.vendorName ?? 'Vendor',
   }
+}
+
+export type AdminChatContext = {
+  threadId: string
+  bookingId: string
+  status: (typeof bookings.$inferSelect)['status']
+  vehicleName: string
+  customerUserId: string
+  vendorUserId: string
+  customerName: string
+  vendorName: string
 }
 
 export type ChatMessageDto = {
@@ -315,6 +326,7 @@ export type AdminChatListRow = {
   customerName: string
   vendorName: string
   lastMessageAt: Date | null
+  lastMessagePreview: string | null
   unreadCustomerCount: number
   unreadVendorCount: number
 }
@@ -338,7 +350,33 @@ export async function listBookingChatsForAdmin(): Promise<AdminChatListRow[]> {
     .innerJoin(vehicles, eq(vehicles.id, bookings.vehicleId))
     .innerJoin(bookingCustomer, eq(bookingCustomer.id, bookings.customerUserId))
     .innerJoin(bookingVendor, eq(bookingVendor.id, bookings.vendorUserId))
-    .orderBy(desc(sql`COALESCE(${chatThreads.lastMessageAt}, ${bookings.createdAt})`))
+  const threadIds = rows.map((r) => r.threadId)
+  const lastMessages = threadIds.length > 0
+    ? await db
+        .select({
+          threadId: messages.threadId,
+          content: messages.content,
+          messageType: messages.messageType,
+        })
+        .from(messages)
+        .where(
+          and(
+            inArray(messages.threadId, threadIds),
+            isNull(messages.deletedAt)
+          )
+        )
+        .orderBy(desc(messages.createdAt), desc(messages.id))
+    : []
+
+  const lastMessageMap = new Map<string, { type: 'TEXT' | 'AUDIO'; content: string | null }>()
+  for (const msg of lastMessages) {
+    if (!lastMessageMap.has(msg.threadId)) {
+      lastMessageMap.set(msg.threadId, {
+        type: msg.messageType as 'TEXT' | 'AUDIO',
+        content: msg.content ?? null,
+      })
+    }
+  }
 
   const customerUnreads = await getUnreadCountsByThreadIdForAdmin(
     rows.map((r) => ({ threadId: r.threadId, userId: r.customerUserId }))
@@ -347,18 +385,30 @@ export async function listBookingChatsForAdmin(): Promise<AdminChatListRow[]> {
     rows.map((r) => ({ threadId: r.threadId, userId: r.vendorUserId }))
   )
 
-  return rows.map((r) => ({
-    bookingId: r.bookingId,
-    threadId: r.threadId,
-    status: r.status,
-    pickupAt: r.pickupAt,
-    vehicleName: r.vehicleName,
-    customerName: r.customerName ?? '',
-    vendorName: r.vendorName ?? '',
-    lastMessageAt: r.lastMessageAt,
-    unreadCustomerCount: customerUnreads.get(r.threadId) ?? 0,
-    unreadVendorCount: vendorUnreads.get(r.threadId) ?? 0,
-  }))
+  return rows.map((r) => {
+    const last = lastMessageMap.get(r.threadId)
+    let preview: string | null = null
+    if (last) {
+      if (last.type === 'AUDIO') {
+        preview = '🎤 Voice message'
+      } else if (last.content) {
+        preview = last.content.length > 40 ? last.content.slice(0, 40) + '…' : last.content
+      }
+    }
+    return {
+      bookingId: r.bookingId,
+      threadId: r.threadId,
+      status: r.status,
+      pickupAt: r.pickupAt,
+      vehicleName: r.vehicleName,
+      customerName: r.customerName ?? '',
+      vendorName: r.vendorName ?? '',
+      lastMessageAt: r.lastMessageAt,
+      lastMessagePreview: preview,
+      unreadCustomerCount: customerUnreads.get(r.threadId) ?? 0,
+      unreadVendorCount: vendorUnreads.get(r.threadId) ?? 0,
+    }
+  })
 }
 
 export async function listBookingChatsForVendor(

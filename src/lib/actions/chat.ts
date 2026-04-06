@@ -98,17 +98,23 @@ export async function sendChatMessage(
     return { ok: false, error: parsed.error.issues[0]?.message ?? 'Invalid message.' }
   }
 
-  const ctx = await getChatContextForBooking({
-    bookingId,
-    userId: user.id,
-  })
+  const ctx =
+    user.role === 'ADMIN'
+      ? await getAdminChatContextForBooking({ bookingId })
+      : await getChatContextForBooking({
+          bookingId,
+          userId: user.id,
+        })
+
   if (!ctx) {
     return { ok: false, error: 'Chat not found.' }
   }
 
-  // Contact-leak detection: only applies before booking is confirmed
+  const isAdmin = user.role === 'ADMIN'
+
+  // Contact-leak detection: only applies before booking is confirmed, and NEVER for admins
   let blockedByContactRule = false
-  if (ctx.status !== 'CONFIRMED') {
+  if (ctx.status !== 'CONFIRMED' && !isAdmin) {
     const leak = isContactLeak(parsed.data)
     if (leak) {
       blockedByContactRule = true
@@ -163,9 +169,13 @@ export async function sendChatMessage(
   updateTag(customerBookingsTag(ctx.customerUserId))
   updateTag(vendorBookingsTag(ctx.vendorUserId))
 
-  const recipientUserId =
-    user.id === ctx.customerUserId ? ctx.vendorUserId : ctx.customerUserId
-  updateTag(unreadMessagesTag(recipientUserId))
+  if (isAdmin) {
+    updateTag(unreadMessagesTag(ctx.customerUserId))
+    updateTag(unreadMessagesTag(ctx.vendorUserId))
+  } else {
+    const recipientUserId = user.id === ctx.customerUserId ? ctx.vendorUserId : ctx.customerUserId
+    updateTag(unreadMessagesTag(recipientUserId))
+  }
 
   const dto: ChatMessageDto = {
     id: inserted.id,
@@ -202,7 +212,11 @@ export async function editChatMessage(
     return { ok: false, error: parsed.error.issues[0]?.message ?? 'Invalid message.' }
   }
 
-  const ctx = await getChatContextForBooking({ bookingId, userId: user.id })
+  const ctx =
+    user.role === 'ADMIN'
+      ? await getAdminChatContextForBooking({ bookingId })
+      : await getChatContextForBooking({ bookingId, userId: user.id })
+
   if (!ctx) {
     return { ok: false, error: 'Chat not found.' }
   }
@@ -267,7 +281,11 @@ export async function deleteChatMessage(
   messageId: string
 ): Promise<DeleteChatMessageResult> {
   const user = await requireCustomerOrVendor()
-  const ctx = await getChatContextForBooking({ bookingId, userId: user.id })
+  const ctx =
+    user.role === 'ADMIN'
+      ? await getAdminChatContextForBooking({ bookingId })
+      : await getChatContextForBooking({ bookingId, userId: user.id })
+
   if (!ctx) {
     return { ok: false, error: 'Chat not found.' }
   }
@@ -372,13 +390,19 @@ export async function sendVoiceMessage(
   durationSeconds: number
 ): Promise<SendChatMessageResult> {
   const user = await requireCustomerOrVendor()
-  const ctx = await getChatContextForBooking({
-    bookingId,
-    userId: user.id,
-  })
+  const ctx =
+    user.role === 'ADMIN'
+      ? await getAdminChatContextForBooking({ bookingId })
+      : await getChatContextForBooking({
+          bookingId,
+          userId: user.id,
+        })
+
   if (!ctx) {
     return { ok: false, error: 'Chat not found.' }
   }
+
+  const isAdmin = user.role === 'ADMIN'
 
   try {
     if (!process.env.CLOUDINARY_CLOUD_NAME) {
@@ -437,9 +461,13 @@ export async function sendVoiceMessage(
     updateTag(customerBookingsTag(ctx.customerUserId))
     updateTag(vendorBookingsTag(ctx.vendorUserId))
 
-    const recipientUserId =
-      user.id === ctx.customerUserId ? ctx.vendorUserId : ctx.customerUserId
-    updateTag(unreadMessagesTag(recipientUserId))
+    if (isAdmin) {
+      updateTag(unreadMessagesTag(ctx.customerUserId))
+      updateTag(unreadMessagesTag(ctx.vendorUserId))
+    } else {
+      const recipientUserId = user.id === ctx.customerUserId ? ctx.vendorUserId : ctx.customerUserId
+      updateTag(unreadMessagesTag(recipientUserId))
+    }
 
     const dto: ChatMessageDto = {
       id: inserted.id,
