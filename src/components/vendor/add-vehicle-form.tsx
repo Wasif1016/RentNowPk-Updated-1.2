@@ -8,7 +8,8 @@ import {
   useRef,
   useState,
 } from 'react'
-import { GripVertical, ImagePlus, Loader2 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { GripVertical, ImagePlus, Loader2, X, Car, MapPin, DollarSign } from 'lucide-react'
 import {
   createVehicle,
   type CreateVehicleFieldKey,
@@ -17,13 +18,6 @@ import {
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import {
-  Field,
-  FieldDescription,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { showToast } from '@/components/ui/toast'
@@ -67,6 +61,7 @@ type AddVehicleFormProps = {
 }
 
 export function AddVehicleForm({ logoDevPublishableKey }: AddVehicleFormProps) {
+  const router = useRouter()
   const [state, formAction, pending] = useActionState(createVehicleFormAction, null)
 
   const [withDriver, setWithDriver] = useState(true)
@@ -170,184 +165,104 @@ export function AddVehicleForm({ logoDevPublishableKey }: AddVehicleFormProps) {
     <>
     <form
       onSubmit={handleSubmit}
-      className="relative flex max-w-2xl flex-col gap-8"
+      className="max-w-3xl space-y-6"
       encType="multipart/form-data"
       aria-busy={pending}
     >
       <input type="hidden" name="coverIndex" value={String(effectiveCoverIndex)} />
-
       {withDriver ? <input type="hidden" name="withDriverEnabled" value="on" /> : null}
       {selfDrive ? <input type="hidden" name="selfDriveEnabled" value="on" /> : null}
 
-      {bannerError && !state?.fieldErrors ? (
-        <p className="text-destructive text-sm" role="alert">
-          {bannerError}
-        </p>
-      ) : null}
+      {bannerError && !state?.fieldErrors && (
+        <div className="rounded-xl bg-destructive/5 border border-destructive/20 p-4">
+          <p className="text-sm text-destructive">{bannerError}</p>
+        </div>
+      )}
 
-      <FieldGroup className="gap-6">
-        <Field data-invalid={!!fieldError(fe, 'name')}>
-          <FieldLabel htmlFor="vehicle-name">Vehicle name</FieldLabel>
-          <Input
-            id="vehicle-name"
-            name="name"
-            required
-            autoComplete="off"
-            placeholder="e.g. Toyota Corolla"
-            className="bg-card border-border"
-            aria-invalid={!!fieldError(fe, 'name')}
+      {/* Vehicle Details */}
+      <SectionCard icon={Car} title="Vehicle details" description="Basic information about your vehicle.">
+        <div className="space-y-4">
+          <Field
+            label="Vehicle name"
+            error={fieldError(fe, 'name')}
+            description="e.g. Toyota Corolla 2024"
+          >
+            <Input
+              id="vehicle-name"
+              name="name"
+              required
+              autoComplete="off"
+              placeholder="e.g. Toyota Corolla"
+              className={cn('bg-muted/50 border-border/50 focus:bg-background', fieldError(fe, 'name') && 'border-destructive')}
+              aria-invalid={!!fieldError(fe, 'name')}
+            />
+          </Field>
+
+          <VehicleMakeModelYear
+            logoDevPublishableKey={logoDevPublishableKey}
+            fieldErrors={
+              fe
+                ? {
+                    make: fieldError(fe, 'make'),
+                    model: fieldError(fe, 'model'),
+                    year: fieldError(fe, 'year'),
+                  }
+                : undefined
+            }
           />
-          {fieldError(fe, 'name') ? (
-            <FieldError>{fieldError(fe, 'name')}</FieldError>
-          ) : null}
-        </Field>
+        </div>
+      </SectionCard>
 
-        <VehicleMakeModelYear
-          logoDevPublishableKey={logoDevPublishableKey}
-          fieldErrors={
-            fe
-              ? {
-                  make: fieldError(fe, 'make'),
-                  model: fieldError(fe, 'model'),
-                  year: fieldError(fe, 'year'),
-                }
-              : undefined
+      {/* Pickup Location */}
+      <SectionCard icon={MapPin} title="Pickup location" description="Where customers will pick up the vehicle.">
+        <VehiclePickupMap
+          fieldError={
+            fieldError(fe, 'pickup') ??
+            fieldError(fe, 'pickupLatitude') ??
+            fieldError(fe, 'pickupLongitude')
           }
         />
-      </FieldGroup>
+      </SectionCard>
 
-      <VehiclePickupMap
-        fieldError={
-          fieldError(fe, 'pickup') ??
-          fieldError(fe, 'pickupLatitude') ??
-          fieldError(fe, 'pickupLongitude')
-        }
-      />
-
-      <div className="border-border space-y-4 rounded-xl border bg-card p-4">
-        <p className="text-foreground text-sm font-medium">Drive types & pricing</p>
-        <FieldDescription>
-          Enable at least one option and enter day and month prices (PKR) for each enabled type.
-        </FieldDescription>
-
-        {(fieldError(fe, 'withDriverEnabled') || fieldError(fe, 'selfDriveEnabled')) && (
-          <p className="text-destructive text-sm">
-            {fieldError(fe, 'withDriverEnabled') ?? fieldError(fe, 'selfDriveEnabled')}
-          </p>
-        )}
-
+      {/* Drive Types & Pricing */}
+      <SectionCard icon={DollarSign} title="Drive types & pricing" description="Enable at least one option and set prices in PKR.">
         <div className="space-y-4">
-          <div className="flex items-start gap-3">
-            <Checkbox
-              id="with-driver"
-              checked={withDriver}
-              onCheckedChange={(v) => setWithDriver(v === true)}
-            />
-            <div className="grid flex-1 gap-3">
-              <Label htmlFor="with-driver" className="text-foreground font-normal">
-                With driver
-              </Label>
-              {withDriver ? (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Field data-invalid={!!fieldError(fe, 'priceWithDriverDay')}>
-                    <FieldLabel htmlFor="pwd-day">Price / day</FieldLabel>
-                    <Input
-                      id="pwd-day"
-                      name="priceWithDriverDay"
-                      type="number"
-                      inputMode="decimal"
-                      step="0.01"
-                      min={0}
-                      placeholder="0.00"
-                      className="bg-background border-border"
-                      aria-invalid={!!fieldError(fe, 'priceWithDriverDay')}
-                    />
-                    {fieldError(fe, 'priceWithDriverDay') ? (
-                      <FieldError>{fieldError(fe, 'priceWithDriverDay')}</FieldError>
-                    ) : null}
-                  </Field>
-                  <Field data-invalid={!!fieldError(fe, 'priceWithDriverMonth')}>
-                    <FieldLabel htmlFor="pwd-month">Price / month</FieldLabel>
-                    <Input
-                      id="pwd-month"
-                      name="priceWithDriverMonth"
-                      type="number"
-                      inputMode="decimal"
-                      step="0.01"
-                      min={0}
-                      placeholder="0.00"
-                      className="bg-background border-border"
-                      aria-invalid={!!fieldError(fe, 'priceWithDriverMonth')}
-                    />
-                    {fieldError(fe, 'priceWithDriverMonth') ? (
-                      <FieldError>{fieldError(fe, 'priceWithDriverMonth')}</FieldError>
-                    ) : null}
-                  </Field>
-                </div>
-              ) : null}
-            </div>
-          </div>
+          {(fieldError(fe, 'withDriverEnabled') || fieldError(fe, 'selfDriveEnabled')) && (
+            <p className="text-sm text-destructive">
+              {fieldError(fe, 'withDriverEnabled') ?? fieldError(fe, 'selfDriveEnabled')}
+            </p>
+          )}
 
-          <div className="flex items-start gap-3">
-            <Checkbox
-              id="self-drive"
-              checked={selfDrive}
-              onCheckedChange={(v) => setSelfDrive(v === true)}
-            />
-            <div className="grid flex-1 gap-3">
-              <Label htmlFor="self-drive" className="text-foreground font-normal">
-                Self drive
-              </Label>
-              {selfDrive ? (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Field data-invalid={!!fieldError(fe, 'priceSelfDriveDay')}>
-                    <FieldLabel htmlFor="psd-day">Price / day</FieldLabel>
-                    <Input
-                      id="psd-day"
-                      name="priceSelfDriveDay"
-                      type="number"
-                      inputMode="decimal"
-                      step="0.01"
-                      min={0}
-                      placeholder="0.00"
-                      className="bg-background border-border"
-                      aria-invalid={!!fieldError(fe, 'priceSelfDriveDay')}
-                    />
-                    {fieldError(fe, 'priceSelfDriveDay') ? (
-                      <FieldError>{fieldError(fe, 'priceSelfDriveDay')}</FieldError>
-                    ) : null}
-                  </Field>
-                  <Field data-invalid={!!fieldError(fe, 'priceSelfDriveMonth')}>
-                    <FieldLabel htmlFor="psd-month">Price / month</FieldLabel>
-                    <Input
-                      id="psd-month"
-                      name="priceSelfDriveMonth"
-                      type="number"
-                      inputMode="decimal"
-                      step="0.01"
-                      min={0}
-                      placeholder="0.00"
-                      className="bg-background border-border"
-                      aria-invalid={!!fieldError(fe, 'priceSelfDriveMonth')}
-                    />
-                    {fieldError(fe, 'priceSelfDriveMonth') ? (
-                      <FieldError>{fieldError(fe, 'priceSelfDriveMonth')}</FieldError>
-                    ) : null}
-                  </Field>
-                </div>
-              ) : null}
-            </div>
-          </div>
+          <DriveTypeSection
+            id="with-driver"
+            label="With driver"
+            checked={withDriver}
+            onCheckedChange={(v) => setWithDriver(v === true)}
+            dayError={fieldError(fe, 'priceWithDriverDay')}
+            monthError={fieldError(fe, 'priceWithDriverMonth')}
+            dayName="priceWithDriverDay"
+            monthName="priceWithDriverMonth"
+            dayId="pwd-day"
+            monthId="pwd-month"
+          />
+
+          <DriveTypeSection
+            id="self-drive"
+            label="Self drive"
+            checked={selfDrive}
+            onCheckedChange={(v) => setSelfDrive(v === true)}
+            dayError={fieldError(fe, 'priceSelfDriveDay')}
+            monthError={fieldError(fe, 'priceSelfDriveMonth')}
+            dayName="priceSelfDriveDay"
+            monthName="priceSelfDriveMonth"
+            dayId="psd-day"
+            monthId="psd-month"
+          />
         </div>
-      </div>
+      </SectionCard>
 
-      <Field data-invalid={!!fieldError(fe, 'images')}>
-        <FieldLabel>Photos</FieldLabel>
-        <FieldDescription>
-          Up to {MAX_FILES} images. The <strong>cover</strong> photo is the one marked below — drag
-          tiles to reorder; the cover is used on listings.
-        </FieldDescription>
-
+      {/* Photos */}
+      <SectionCard icon={ImagePlus} title="Photos" description={`Up to ${MAX_FILES} images. Drag to reorder. The cover photo appears on listings.`}>
         <input
           ref={fileInputRef}
           id="vehicle-images"
@@ -375,27 +290,24 @@ export function AddVehicleForm({ logoDevPublishableKey }: AddVehicleFormProps) {
           }}
           onDrop={onDropZoneDrop}
           className={cn(
-            'border-border bg-muted/30 hover:bg-muted/50 mt-2 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed px-4 py-10 transition-colors',
+            'border-border bg-muted/30 hover:bg-muted/50 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-8 transition-colors',
             fieldError(fe, 'images') && 'border-destructive'
           )}
         >
-          <ImagePlus className="text-muted-foreground size-10" strokeWidth={1.25} />
+          <ImagePlus className="text-muted-foreground size-8" strokeWidth={1.25} />
           <div className="text-center">
             <p className="text-foreground text-sm font-medium">Add photos</p>
-            <p className="text-muted-foreground mt-1 text-xs">
-              Click or drop files here · JPEG, PNG, WebP · max {MAX_FILES} files
+            <p className="text-muted-foreground mt-0.5 text-xs">
+              Click or drop · JPEG, PNG, WebP · max {MAX_FILES}
             </p>
           </div>
-          <Button type="button" variant="secondary" size="sm" className="pointer-events-none mt-1">
-            Browse files
-          </Button>
         </div>
 
-        {fieldError(fe, 'images') ? (
-          <FieldError className="mt-2">{fieldError(fe, 'images')}</FieldError>
-        ) : null}
+        {fieldError(fe, 'images') && (
+          <p className="text-xs text-destructive mt-1">{fieldError(fe, 'images')}</p>
+        )}
 
-        {fileList.length > 0 ? (
+        {fileList.length > 0 && (
           <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
             {fileList.map((file, i) => (
               <li
@@ -418,8 +330,8 @@ export function AddVehicleForm({ logoDevPublishableKey }: AddVehicleFormProps) {
               >
                 <div
                   className={cn(
-                    'border-border bg-card relative aspect-4/3 overflow-hidden rounded-xl border shadow-sm transition-shadow',
-                    effectiveCoverIndex === i && 'ring-primary ring-2 ring-offset-2 ring-offset-background'
+                    'border-border bg-card relative aspect-4/3 overflow-hidden rounded-xl border shadow-sm transition-all',
+                    effectiveCoverIndex === i && 'ring-2 ring-primary ring-offset-2 ring-offset-background'
                   )}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element -- blob previews */}
@@ -428,24 +340,21 @@ export function AddVehicleForm({ logoDevPublishableKey }: AddVehicleFormProps) {
                     alt=""
                     className="size-full object-cover"
                   />
-                  <div className="absolute top-1 left-1 flex items-center gap-0.5 rounded-md bg-black/55 px-1 py-0.5 text-white backdrop-blur-sm">
-                    <GripVertical className="size-3.5 shrink-0 opacity-90" aria-hidden />
+                  <div className="absolute top-1 left-1 flex items-center gap-0.5 rounded-md bg-black/55 px-1.5 py-0.5 text-white backdrop-blur-sm">
+                    <GripVertical className="size-3 shrink-0 opacity-90" aria-hidden />
                     <span className="text-[10px] font-medium">{i + 1}</span>
                   </div>
-                  {effectiveCoverIndex === i ? (
+                  {effectiveCoverIndex === i && (
                     <span className="bg-primary text-primary-foreground absolute bottom-1 right-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold">
                       Cover
                     </span>
-                  ) : null}
+                  )}
                   <button
                     type="button"
-                    className="hover:bg-destructive/15 absolute top-1 right-1 rounded-md bg-black/50 px-1.5 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm"
+                    className="absolute top-1 right-1 rounded-md bg-black/50 p-1 text-white backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/80"
                     onClick={(e) => {
                       e.stopPropagation()
-                      setFileList((prev) => {
-                        const next = prev.filter((_, j) => j !== i)
-                        return next
-                      })
+                      setFileList((prev) => prev.filter((_, j) => j !== i))
                       setCoverIndex((ci) => {
                         if (ci === i) return 0
                         if (ci > i) return ci - 1
@@ -453,14 +362,14 @@ export function AddVehicleForm({ logoDevPublishableKey }: AddVehicleFormProps) {
                       })
                     }}
                   >
-                    Remove
+                    <X className="h-3 w-3" />
                   </button>
                 </div>
                 <Button
                   type="button"
                   variant={effectiveCoverIndex === i ? 'default' : 'outline'}
                   size="sm"
-                  className="mt-2 h-8 w-full text-xs"
+                  className="mt-1.5 h-7 w-full text-[11px]"
                   onClick={() => setCoverIndex(i)}
                 >
                   {effectiveCoverIndex === i ? 'Cover photo' : 'Set as cover'}
@@ -468,34 +377,158 @@ export function AddVehicleForm({ logoDevPublishableKey }: AddVehicleFormProps) {
               </li>
             ))}
           </ul>
-        ) : null}
+        )}
 
-        {fieldError(fe, 'coverIndex') ? (
-          <FieldError className="mt-2">{fieldError(fe, 'coverIndex')}</FieldError>
-        ) : null}
-      </Field>
+        {fieldError(fe, 'coverIndex') && (
+          <p className="text-xs text-destructive mt-1">{fieldError(fe, 'coverIndex')}</p>
+        )}
+      </SectionCard>
 
-      <Button type="submit" disabled={pending} className="w-full sm:w-auto">
-        {pending ? 'Saving…' : 'Save vehicle'}
-      </Button>
+      {/* Submit */}
+      <div className="flex justify-end pt-2">
+        <Button type="submit" disabled={pending} size="lg" className="rounded-xl px-8">
+          {pending ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Saving…
+            </>
+          ) : (
+            'Save vehicle'
+          )}
+        </Button>
+      </div>
     </form>
 
-    {pending ? (
+    {pending && (
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-background/75 backdrop-blur-[1px]"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm"
         role="status"
         aria-live="polite"
         aria-label="Saving vehicle"
       >
-        <div className="border-border bg-card flex flex-col items-center gap-3 rounded-2xl border px-8 py-6 shadow-xl">
-          <Loader2 className="text-primary size-9 animate-spin" aria-hidden />
+        <div className="bg-card flex flex-col items-center gap-3 rounded-2xl border border-border px-8 py-6 shadow-xl">
+          <Loader2 className="text-primary size-8 animate-spin" aria-hidden />
           <p className="text-foreground text-sm font-medium">Saving vehicle…</p>
           <p className="text-muted-foreground max-w-xs text-center text-xs">
-            Uploading photos and creating your listing. Please wait.
+            Uploading photos and creating your listing.
           </p>
         </div>
       </div>
-    ) : null}
+    )}
     </>
+  )
+}
+
+function SectionCard({
+  icon: Icon,
+  title,
+  description,
+  children,
+}: {
+  icon: React.ComponentType<{ className?: string }>
+  title: string
+  description: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="rounded-xl bg-card border border-border shadow-sm p-6">
+      <div className="flex items-start gap-3 mb-5">
+        <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+          <Icon className="h-4 w-4 text-primary" />
+        </div>
+        <div>
+          <h3 className="text-base font-semibold text-foreground">{title}</h3>
+          <p className="text-sm text-muted-foreground mt-0.5">{description}</p>
+        </div>
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function Field({
+  label,
+  error,
+  description,
+  children,
+}: {
+  label: string
+  error?: string
+  description?: string
+  children: React.ReactNode
+}) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-foreground mb-1.5">{label}</label>
+      {children}
+      {error && <p className="text-xs text-destructive mt-1">{error}</p>}
+      {description && !error && <p className="text-xs text-muted-foreground mt-1">{description}</p>}
+    </div>
+  )
+}
+
+function DriveTypeSection({
+  id,
+  label,
+  checked,
+  onCheckedChange,
+  dayError,
+  monthError,
+  dayName,
+  monthName,
+  dayId,
+  monthId,
+}: {
+  id: string
+  label: string
+  checked: boolean
+  onCheckedChange: (v: boolean) => void
+  dayError?: string
+  monthError?: string
+  dayName: string
+  monthName: string
+  dayId: string
+  monthId: string
+}) {
+  return (
+    <div className="rounded-lg border border-border/50 p-4 space-y-3">
+      <div className="flex items-center gap-3">
+        <Checkbox id={id} checked={checked} onCheckedChange={(v) => onCheckedChange(v === true)} />
+        <Label htmlFor={id} className="text-sm font-medium text-foreground cursor-pointer">
+          {label}
+        </Label>
+      </div>
+
+      {checked && (
+        <div className="grid gap-3 sm:grid-cols-2 pl-7">
+          <Field label="Price / day" error={dayError}>
+            <Input
+              id={dayId}
+              name={dayName}
+              type="number"
+              inputMode="decimal"
+              step="0.01"
+              min={0}
+              placeholder="0.00"
+              className={cn('bg-muted/50 border-border/50 focus:bg-background', dayError && 'border-destructive')}
+              aria-invalid={!!dayError}
+            />
+          </Field>
+          <Field label="Price / month" error={monthError}>
+            <Input
+              id={monthId}
+              name={monthName}
+              type="number"
+              inputMode="decimal"
+              step="0.01"
+              min={0}
+              placeholder="0.00"
+              className={cn('bg-muted/50 border-border/50 focus:bg-background', monthError && 'border-destructive')}
+              aria-invalid={!!monthError}
+            />
+          </Field>
+        </div>
+      )}
+    </div>
   )
 }

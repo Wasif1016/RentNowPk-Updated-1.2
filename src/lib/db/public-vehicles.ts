@@ -1,6 +1,6 @@
 import 'server-only'
 
-import { and, asc, eq, inArray, isNotNull } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import {
   vehicleCities,
@@ -244,4 +244,91 @@ export async function searchPublicVehiclesNearPickup(params: {
   }
 
   return ordered
+}
+
+export type FeaturedVehicleCard = {
+  vehicleId: string
+  vendorSlug: string
+  vehicleSlug: string
+  name: string
+  make: string
+  model: string
+  year: number
+  coverImageUrl: string | null
+  withDriverEnabled: boolean
+  selfDriveEnabled: boolean
+  minDayPrice: string | null
+  avgRating: string
+  totalReviews: number
+}
+
+/**
+ * Featured vehicles for the homepage — returns up to `limit` active vehicles
+ * from approved vendors, ordered by rating then creation date.
+ */
+export async function getFeaturedVehicles(limit = 8): Promise<FeaturedVehicleCard[]> {
+  const rows = await db
+    .select({
+      vehicle: vehicles,
+      vendorSlug: vendorProfiles.publicSlug,
+      avgRating: vendorProfiles.avgRating,
+      totalReviews: vendorProfiles.totalReviews,
+    })
+    .from(vehicles)
+    .innerJoin(vendorProfiles, eq(vehicles.vendorId, vendorProfiles.id))
+    .where(
+      and(
+        eq(vendorProfiles.verificationStatus, 'APPROVED'),
+        eq(vehicles.isActive, true)
+      )
+    )
+    .orderBy(
+      desc(sql`COALESCE(NULLIF(${vendorProfiles.avgRating}, '0'), '0')::numeric`),
+      desc(vehicles.createdAt)
+    )
+    .limit(limit)
+
+  if (rows.length === 0) return []
+
+  const ids = rows.map((r) => r.vehicle.id)
+
+  const imgRows = await db
+    .select({
+      vehicleId: vehicleImages.vehicleId,
+      url: vehicleImages.url,
+      isCover: vehicleImages.isCover,
+      sortOrder: vehicleImages.sortOrder,
+    })
+    .from(vehicleImages)
+    .where(inArray(vehicleImages.vehicleId, ids))
+
+  const imagesByVehicle = new Map<
+    string,
+    Array<{ url: string; isCover: boolean; sortOrder: number }>
+  >()
+  for (const im of imgRows) {
+    const list = imagesByVehicle.get(im.vehicleId) ?? []
+    list.push(im)
+    imagesByVehicle.set(im.vehicleId, list)
+  }
+
+  return rows.map((r) => {
+    const v = r.vehicle
+    const imgs = imagesByVehicle.get(v.id) ?? []
+    return {
+      vehicleId: v.id,
+      vendorSlug: r.vendorSlug,
+      vehicleSlug: v.slug,
+      name: v.name,
+      make: v.make,
+      model: v.model,
+      year: v.year,
+      coverImageUrl: pickCoverUrl(imgs),
+      withDriverEnabled: v.withDriverEnabled,
+      selfDriveEnabled: v.selfDriveEnabled,
+      minDayPrice: minEnabledDayPrice(v),
+      avgRating: r.avgRating ?? '0',
+      totalReviews: r.totalReviews ?? 0,
+    }
+  })
 }

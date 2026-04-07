@@ -25,7 +25,7 @@ export const VENDOR_NAV: DashboardNavItem[] = [
   { href: "/vendor/vehicles/add", label: "Add vehicle", icon: Add01Icon },
   { href: "/vendor/bookings", label: "Bookings", icon: Calendar03Icon },
   { href: "/vendor/chat", label: "Messages", icon: Chat01Icon },
-  { href: "/vendor/profile", label: "Profile", icon: User02Icon },
+  { href: "/vendor/profile", label: "Settings", icon: Settings01Icon },
 ]
 
 export const CUSTOMER_NAV: DashboardNavItem[] = [

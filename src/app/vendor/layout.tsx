@@ -28,6 +28,7 @@ export default async function VendorLayout({ children }: { children: React.React
         email: user.email,
         fullName: user.fullName,
         avatarUrl: user.avatarUrl,
+        verificationStatus: vendorProfile?.verificationStatus ?? null,
       }}
     >
       <UnreadBadgeRefreshOnFocus />

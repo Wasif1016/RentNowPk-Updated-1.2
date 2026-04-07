@@ -6,83 +6,85 @@ export async function MarketingFooter() {
   const user = await getOptionalUser()
 
   return (
-    <footer className="border-border mt-auto border-t bg-muted/30">
-      <div className="container mx-auto max-w-6xl px-4 py-10">
-        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-          <div>
-            <p className="text-foreground font-semibold">RentNowPk</p>
-            <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
-              Find and book rental vehicles from verified vendors across Pakistan.
+    <footer className="bg-gray-50 border-t border-gray-100">
+      <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8 py-12">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+          {/* Brand */}
+          <div className="col-span-2 md:col-span-1">
+            <p className="text-lg font-extrabold text-primary tracking-tight">RentNowPk</p>
+            <p className="mt-2 text-sm text-gray-500 leading-relaxed">
+              The smarter way to rent a car in Pakistan.
             </p>
           </div>
+
+          {/* Explore */}
           <div>
-            <p className="text-foreground text-sm font-medium">Explore</p>
-            <ul className="text-muted-foreground mt-3 space-y-2 text-sm">
+            <p className="text-sm font-semibold text-gray-900 mb-3">Explore</p>
+            <ul className="space-y-2.5">
               <li>
-                <Link href="/search" className="hover:text-foreground transition-colors">
+                <Link href="/search" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">
                   Search vehicles
                 </Link>
               </li>
               <li>
-                <Link href="/for-vendors" className="hover:text-foreground transition-colors">
-                  Become a vendor
+                <Link href="/for-vendors" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">
+                  List your car
                 </Link>
               </li>
-              {user ? (
-                <li>
-                  <Link
-                    href={defaultPathForRole(user.role as AppRole)}
-                    className="hover:text-foreground transition-colors"
-                  >
-                    Your dashboard
-                  </Link>
-                </li>
-              ) : (
-                <li>
-                  <Link href="/auth/login" className="hover:text-foreground transition-colors">
-                    Log in
-                  </Link>
-                </li>
-              )}
             </ul>
           </div>
-          <div className="sm:col-span-2 lg:col-span-1">
-            <p className="text-foreground text-sm font-medium">Account</p>
-            <ul className="text-muted-foreground mt-3 space-y-2 text-sm">
+
+          {/* Account */}
+          <div>
+            <p className="text-sm font-semibold text-gray-900 mb-3">Account</p>
+            <ul className="space-y-2.5">
               {user ? (
                 <>
                   <li>
-                    <span className="text-foreground/80">{user.email}</span>
-                  </li>
-                  <li>
                     <Link
                       href={defaultPathForRole(user.role as AppRole)}
-                      className="hover:text-foreground transition-colors"
+                      className="text-sm text-gray-500 hover:text-gray-900 transition-colors"
                     >
-                      Open dashboard
+                      Dashboard
                     </Link>
+                  </li>
+                  <li>
+                    <span className="text-sm text-gray-400">{user.email}</span>
                   </li>
                 </>
               ) : (
                 <>
                   <li>
-                    <Link href="/auth/login" className="hover:text-foreground transition-colors">
+                    <Link href="/auth/login" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">
                       Log in
                     </Link>
                   </li>
                   <li>
-                    <Link href="/auth/signup" className="hover:text-foreground transition-colors">
-                      Create vendor account
+                    <Link href="/auth/signup" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">
+                      Sign up
                     </Link>
                   </li>
                 </>
               )}
             </ul>
           </div>
+
+          {/* Support */}
+          <div>
+            <p className="text-sm font-semibold text-gray-900 mb-3">Support</p>
+            <ul className="space-y-2.5">
+              <li>
+                <span className="text-sm text-gray-500">help@rentnowpk.com</span>
+              </li>
+            </ul>
+          </div>
         </div>
-        <p className="text-muted-foreground mt-10 border-t border-border pt-6 text-center text-xs">
-          © {new Date().getFullYear()} RentNowPk. All rights reserved.
-        </p>
+
+        <div className="mt-10 pt-6 border-t border-gray-200">
+          <p className="text-center text-xs text-gray-400">
+            © {new Date().getFullYear()} RentNowPk. All rights reserved.
+          </p>
+        </div>
       </div>
     </footer>
   )

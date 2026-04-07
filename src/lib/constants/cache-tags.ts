@@ -1,5 +1,9 @@
 // Cache tags — use with "use cache" and updateTag() per AGENTS.md
 
+export function customerProfileTag(userId?: string) {
+  return userId ? `customer-profile-${userId}` : 'customer-profile-all'
+}
+
 export function vendorProfileTag(vendorId: string) {
   return `vendor-profile-${vendorId}`
 }
@@ -56,6 +60,7 @@ export const CACHE_INVALIDATION_MAP = {
 } as const
 
 export type CacheTag =
+  | ReturnType<typeof customerProfileTag>
   | ReturnType<typeof vendorProfileTag>
   | ReturnType<typeof vendorVehiclesTag>
   | ReturnType<typeof vehiclePublicTag>

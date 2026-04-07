@@ -18,7 +18,7 @@ import {
 } from '@/hooks/use-booking-chat'
 import { useAudioRecorder } from '@/hooks/use-audio-recorder'
 import { VoiceMessage } from '@/components/chat/voice-message'
-import { Mic, Square, X, SendHorizontal, Check, CheckCheck, MapPin } from 'lucide-react'
+import { Mic, Square, X, SendHorizontal, Check, CheckCheck, Paperclip } from 'lucide-react'
 import { toast } from 'sonner'
 import type { bookings } from '@/lib/db/schema'
 import type { ChatMessageDto, MessageCursor } from '@/lib/db/chat'
@@ -392,7 +392,7 @@ export function BookingChatPanel({
 
   return (
     <div className={shellClass}>
-      <header className="border-border shrink-0 border-b px-4 py-3">
+      <header className="border-border shrink-0 border-b px-5 py-3 bg-card/70 backdrop-blur-sm">
         <div className="flex flex-col gap-1">
           {layout === 'standalone' && backHref ? (
             <Link
@@ -402,10 +402,13 @@ export function BookingChatPanel({
               ← Back to bookings
             </Link>
           ) : null}
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-foreground text-lg font-semibold">{title}</h1>
-              <p className="text-muted-foreground text-sm">{subtitle}</p>
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm shrink-0">
+              {title.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+            </div>
+            <div className="min-w-0">
+              <h3 className="font-semibold text-foreground text-sm truncate">{title}</h3>
+              <p className="text-xs text-muted-foreground/60 truncate">{subtitle}</p>
             </div>
           </div>
         </div>
@@ -480,43 +483,64 @@ export function BookingChatPanel({
         </p>
       ) : null}
 
-      <footer className="border-border shrink-0 border-t p-3">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-          {recorder.status === 'recording' ? (
-            <div className="bg-muted flex flex-1 items-center gap-3 rounded-lg px-3 py-2">
-              <div className="flex h-2 w-2 animate-pulse rounded-full bg-red-500" />
-              <span className="text-xs font-medium tabular-nums">
-                Recording: {Math.floor(recorder.duration / 60)}:{(recorder.duration % 60).toString().padStart(2, '0')}
-              </span>
-              <div className="flex-1" />
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                onClick={recorder.cancelRecording}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="default"
-                size="icon"
-                className="h-8 w-8 rounded-full"
-                onClick={handleSendVoice}
+      <footer className="border-border shrink-0 border-t p-4 bg-card">
+        {recorder.status === 'recording' ? (
+          <div className="bg-muted flex flex-1 items-center gap-3 rounded-xl px-4 py-3">
+            <div className="flex h-2.5 w-2.5 animate-pulse rounded-full bg-red-500" />
+            <span className="text-sm font-medium tabular-nums">
+              {Math.floor(recorder.duration / 60)}:{(recorder.duration % 60).toString().padStart(2, '0')}
+            </span>
+            <div className="flex-1" />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-destructive hover:bg-destructive/10 rounded-full"
+              onClick={recorder.cancelRecording}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="default"
+              size="icon"
+              className="h-9 w-9 rounded-full"
+              onClick={handleSendVoice}
+              disabled={isSendingVoice}
+            >
+              <SendHorizontal className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-end gap-2">
+              {/* File upload (placeholder — voice only for now) */}
+              <label className="cursor-pointer p-2.5 text-muted-foreground hover:text-primary transition-colors rounded-full hover:bg-muted/50">
+                <Paperclip className="h-5 w-5" />
+                <input type="file" className="hidden" disabled />
+              </label>
+
+              {/* Voice button */}
+              <button
+                type="button"
+                className={cn(
+                  'p-2.5 rounded-full transition-colors hover:bg-muted/50',
+                  isSendingVoice ? 'text-red-500 animate-pulse' : 'text-muted-foreground hover:text-primary'
+                )}
+                onClick={() => recorder.startRecording()}
                 disabled={isSendingVoice}
+                title="Record voice message"
               >
-                <SendHorizontal className="h-4 w-4" />
-              </Button>
-            </div>
-          ) : (
-            <>
-              <div className="relative flex-1">
+                <Mic className="h-5 w-5" />
+              </button>
+
+              {/* Text input */}
+              <div className="flex-1 relative">
                 <Textarea
                   value={draft}
                   onChange={(e) => handleDraftChange(e.target.value)}
-                  placeholder="Type a message…"
+                  placeholder="Type your message..."
                   disabled={isSendingVoice}
-                  rows={2}
-                  className="min-h-[44px] flex-1 resize-none pr-10"
+                  rows={1}
+                  className="min-h-[44px] flex-1 resize-none rounded-2xl bg-muted/50 border-border/50 focus:bg-background pr-12 text-sm"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault()
@@ -528,8 +552,10 @@ export function BookingChatPanel({
                   variant="ghost"
                   size="icon"
                   className={cn(
-                    "absolute bottom-1 right-1 h-8 w-8 text-muted-foreground transition-colors hover:text-primary",
-                    draft.trim() ? "text-primary" : ""
+                    "absolute bottom-1 right-1 h-9 w-9 rounded-full transition-all",
+                    draft.trim()
+                      ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-md"
+                      : "text-muted-foreground hover:text-primary"
                   )}
                   onClick={handleSendMessage}
                   disabled={!draft.trim() || isSendingVoice}
@@ -538,34 +564,30 @@ export function BookingChatPanel({
                 </Button>
               </div>
 
-              <div className="flex shrink-0 gap-2">
-                {isVendor && bookingStatus === 'CONFIRMED' && (
-                  <Button
-                    variant="outline"
-                    className="flex-1 sm:flex-none"
-                    onClick={() => setOfferOpen(true)}
-                  >
-                    Send Offer
-                  </Button>
-                )}
-                
+              {/* Send Offer (vendor only, confirmed bookings) */}
+              {isVendor && bookingStatus === 'CONFIRMED' && (
                 <Button
                   variant="outline"
-                  size="icon"
-                  className={cn(
-                    "h-[44px] w-[44px] rounded-lg border-2 transition-all duration-300",
-                    isSendingVoice ? "animate-pulse" : ""
-                  )}
-                  onClick={() => recorder.startRecording()}
-                  disabled={isSendingVoice}
-                  title="Record voice message"
+                  size="sm"
+                  className="shrink-0 rounded-xl text-xs"
+                  onClick={() => setOfferOpen(true)}
                 >
-                  <Mic className="h-5 w-5" />
+                  Send Offer
                 </Button>
-              </div>
-            </>
-          )}
-        </div>
+              )}
+            </div>
+
+            <div className="flex justify-between items-center mt-2 text-xs text-muted-foreground/60">
+              <span className="flex items-center gap-1">
+                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                End-to-end encrypted
+              </span>
+              <span>Voice messages supported</span>
+            </div>
+          </>
+        )}
       </footer>
 
       <RejectDialog
@@ -750,10 +772,10 @@ function MessageBubbleItem({
       <div className="relative">
         <div
           className={cn(
-            'rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap',
+            'rounded-[1.25rem] px-3 py-2 text-sm whitespace-pre-wrap shadow-[0_1px_1px_rgba(0,0,0,0.02)]',
             isOwn
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-muted text-foreground',
+              ? 'bg-primary text-primary-foreground rounded-br-[0.25rem]'
+              : 'bg-muted text-foreground rounded-bl-[0.25rem]',
             pending && 'opacity-80'
           )}
         >

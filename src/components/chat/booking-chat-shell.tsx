@@ -11,7 +11,7 @@ export function BookingChatShell({
   children: React.ReactNode
 }) {
   return (
-    <div className="border-border bg-card flex min-h-[min(72vh,680px)] flex-1 overflow-hidden rounded-xl border">
+    <div className="flex min-h-[min(72vh,680px)] flex-1 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
       <ChatThreadSidebar rows={rows} basePath={basePath} />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
     </div>

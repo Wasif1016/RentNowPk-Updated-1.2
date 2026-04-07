@@ -4,9 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import { importLibrary, setOptions } from '@googlemaps/js-api-loader'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { MapPin, Search, Calendar } from 'lucide-react'
+import { MapPin, Search, CalendarDays } from 'lucide-react'
 
 function localInputValue(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0')
@@ -85,65 +83,74 @@ export function HeroSearchWidget() {
     router.push(`/search?${params.toString()}`)
   }
 
+  const canSearch = pickupPlaceId && dropoffPlaceId
+
   return (
-    <div className="w-full max-w-4xl mx-auto">
-      <div className="rounded-2xl border border-border/50 bg-card/80 backdrop-blur-sm p-4 sm:p-6 shadow-lg">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-12 lg:items-end">
-          <div className="lg:col-span-4 space-y-1.5">
-            <Label htmlFor="hero-pickup" className="text-xs font-medium flex items-center gap-1.5">
-              <MapPin className="h-3.5 w-3.5" /> Pickup
-            </Label>
-            <Input
-              ref={pickupRef}
-              id="hero-pickup"
-              autoComplete="off"
-              placeholder="Where are you?"
-              className="bg-background h-10"
-            />
+    <div className="w-full max-w-5xl">
+      <div className="rounded-2xl border border-border/50 bg-white p-3 shadow-[0_20px_50px_-15px_rgba(1,82,203,0.1)]">
+        <div className="flex flex-col items-stretch gap-2 md:flex-row">
+          <div className="flex-1 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="group flex items-center rounded-xl border border-border/20 bg-muted/60 px-4 py-3 transition-colors focus-within:border-primary">
+              <MapPin className="mr-2 h-5 w-5 shrink-0 text-muted-foreground" />
+              <input
+                ref={pickupRef}
+                autoComplete="off"
+                placeholder="Pickup Location"
+                className="w-full border-none bg-transparent text-[14px] font-medium outline-none focus:ring-0 placeholder:text-muted-foreground/60"
+              />
+            </div>
+
+            <div className="group flex items-center rounded-xl border border-border/20 bg-muted/60 px-4 py-3 transition-colors focus-within:border-primary">
+              <MapPin className="mr-2 h-5 w-5 shrink-0 text-muted-foreground" />
+              <input
+                ref={dropRef}
+                autoComplete="off"
+                placeholder="Drop-off Location"
+                className="w-full border-none bg-transparent text-[14px] font-medium outline-none focus:ring-0 placeholder:text-muted-foreground/60"
+              />
+            </div>
+
+            <div className="group flex items-center rounded-xl border border-border/20 bg-muted/60 px-4 py-3 transition-colors focus-within:border-primary">
+              <CalendarDays className="mr-2 h-5 w-5 shrink-0 text-muted-foreground" />
+              <input
+                type="datetime-local"
+                value={pickupAt}
+                onChange={(e) => setPickupAt(e.target.value)}
+                className="w-full border-none bg-transparent text-[14px] font-medium outline-none focus:ring-0 [color-scheme:light]"
+              />
+            </div>
+
+            <div className="group flex items-center rounded-xl border border-border/20 bg-muted/60 px-4 py-3 transition-colors focus-within:border-primary">
+              <CalendarDays className="mr-2 h-5 w-5 shrink-0 text-muted-foreground" />
+              <input
+                type="datetime-local"
+                value={dropoffAt}
+                onChange={(e) => setDropoffAt(e.target.value)}
+                className="w-full border-none bg-transparent text-[14px] font-medium outline-none focus:ring-0 [color-scheme:light]"
+              />
+            </div>
           </div>
-          <div className="lg:col-span-4 space-y-1.5">
-            <Label htmlFor="hero-dropoff" className="text-xs font-medium flex items-center gap-1.5">
-              <MapPin className="h-3.5 w-3.5" /> Destination
-            </Label>
-            <Input
-              ref={dropRef}
-              id="hero-dropoff"
-              autoComplete="off"
-              placeholder="Where to?"
-              className="bg-background h-10"
-            />
-          </div>
-          <div className="lg:col-span-2 space-y-1.5">
-            <Label htmlFor="hero-pickupAt" className="text-xs font-medium flex items-center gap-1.5">
-              <Calendar className="h-3.5 w-3.5" /> Pickup
-            </Label>
-            <Input
-              id="hero-pickupAt"
-              type="datetime-local"
-              value={pickupAt}
-              onChange={(e) => setPickupAt(e.target.value)}
-              className="bg-background h-10"
-            />
-          </div>
-          <div className="lg:col-span-2 flex gap-2">
-            <Button
-              type="button"
-              className="w-full h-10"
-              disabled={!pickupPlaceId || !dropoffPlaceId}
-              onClick={handleSearch}
-            >
-              <Search className="h-4 w-4 mr-1.5" />
-              Search
-            </Button>
-          </div>
+
+          <Button
+            type="button"
+            className="flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-[14px] font-bold shadow-lg shadow-primary/20 transition-all md:w-36"
+            disabled={!canSearch}
+            onClick={handleSearch}
+          >
+            Search
+            <Search className="h-5 w-5" />
+          </Button>
         </div>
-        {!mapsReady && apiKey && (
-          <p className="mt-2 text-xs text-muted-foreground">Loading maps…</p>
-        )}
-        {!apiKey && (
-          <p className="mt-2 text-xs text-muted-foreground">Maps not configured — search will use basic filters.</p>
-        )}
       </div>
+
+      {!mapsReady && apiKey && (
+        <p className="mt-2 text-center text-xs text-muted-foreground">Loading maps…</p>
+      )}
+      {!apiKey && (
+        <p className="mt-2 text-center text-xs text-muted-foreground">
+          Maps not configured — search will use basic filters.
+        </p>
+      )}
     </div>
   )
 }

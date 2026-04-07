@@ -21,77 +21,87 @@ export async function MarketingHeader() {
   const user = await getOptionalUser()
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/80">
-      <div className="container mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 sm:h-16">
+    <header className="fixed top-0 z-50 w-full bg-white/95 backdrop-blur-sm border-b border-gray-100">
+      <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-4 h-16 sm:px-6 lg:px-8">
+        {/* Logo */}
         <Link
           href="/"
-          className="text-foreground shrink-0 text-lg font-semibold tracking-tight sm:text-xl"
+          className="text-xl font-extrabold tracking-tight text-primary shrink-0"
         >
           RentNowPk
         </Link>
 
+        {/* Center nav */}
         <nav
-          className="text-muted-foreground hidden items-center gap-6 text-sm font-medium md:flex"
+          className="hidden md:flex items-center gap-8"
           aria-label="Main"
         >
-          <Link href="/search" className="hover:text-foreground transition-colors">
-            Search
+          <Link
+            href="/search"
+            className="text-sm font-medium text-gray-700 hover:text-primary transition-colors"
+          >
+            Explore
           </Link>
-          <Link href="/for-vendors" className="hover:text-foreground transition-colors">
-            For vendors
+          <Link
+            href="/for-vendors"
+            className="text-sm font-medium text-gray-700 hover:text-primary transition-colors"
+          >
+            List your car
           </Link>
         </nav>
 
-        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+        {/* Right side */}
+        <div className="flex items-center gap-2 sm:gap-3">
           {user ? (
             <>
               <span
-                className="text-muted-foreground hidden max-w-[140px] truncate text-xs sm:max-w-[200px] sm:text-sm lg:inline"
+                className="hidden max-w-[140px] truncate text-sm text-gray-600 lg:inline"
                 title={user.email}
               >
                 {user.fullName}
               </span>
-              <Button variant="outline" size="sm" asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                asChild
+                className="h-9 rounded-full text-sm font-medium border-gray-300"
+              >
                 <Link href={defaultPathForRole(user.role as AppRole)}>
                   <span className="hidden sm:inline">{dashboardLabel(user.role as AppRole)}</span>
                   <span className="sm:hidden">Dashboard</span>
                 </Link>
               </Button>
               <form action={logoutAction}>
-                <Button type="submit" variant="ghost" size="sm" className="text-muted-foreground">
+                <Button
+                  type="submit"
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 text-sm text-gray-600"
+                >
                   Sign out
                 </Button>
               </form>
             </>
           ) : (
             <>
-              <Button variant="ghost" size="sm" asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                asChild
+                className="h-9 rounded-full px-4 text-sm font-medium text-gray-700 hover:bg-gray-100"
+              >
                 <Link href="/auth/login">Log in</Link>
               </Button>
-              <Button variant="outline" size="sm" asChild>
-                <Link href="/auth/signup">For vendors</Link>
-              </Button>
-              <Button size="sm" asChild>
-                <Link href="/auth/signup-customer">Sign up</Link>
+              <Button
+                size="sm"
+                asChild
+                className="h-9 rounded-full px-5 text-sm font-semibold bg-primary hover:bg-primary/90 text-white"
+              >
+                <Link href="/auth/signup">Sign up</Link>
               </Button>
             </>
           )}
         </div>
-      </div>
-
-      {/* Mobile nav row */}
-      <div className="border-border border-t md:hidden">
-        <nav
-          className="text-muted-foreground container mx-auto flex max-w-6xl gap-4 overflow-x-auto px-4 py-2 text-sm font-medium"
-          aria-label="Mobile main"
-        >
-          <Link href="/search" className="hover:text-foreground shrink-0 transition-colors">
-            Search
-          </Link>
-          <Link href="/for-vendors" className="hover:text-foreground shrink-0 transition-colors">
-            For vendors
-          </Link>
-        </nav>
       </div>
     </header>
   )

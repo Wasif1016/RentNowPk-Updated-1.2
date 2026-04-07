@@ -18,9 +18,9 @@ export function AdminBookingChatShell({
   const isSelected = !!params.bookingId
 
   return (
-    <div className="border-border bg-card flex min-h-[min(72vh,680px)] flex-1 overflow-hidden rounded-xl border">
+    <div className="flex min-h-[min(72vh,680px)] flex-1 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
       <div className={cn(
-        "shrink-0 border-r border-border md:block md:w-[280px]",
+        "shrink-0 border-r border-border md:block md:w-[320px]",
         isSelected ? "hidden" : "w-full block"
       )}>
         <AdminChatThreadSidebar rows={rows} basePath={basePath} />
