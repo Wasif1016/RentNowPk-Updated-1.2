@@ -314,7 +314,7 @@ export async function getFeaturedVehicles(limit = 8): Promise<FeaturedVehicleCar
       )
     )
     .orderBy(
-      desc(sql`COALESCE(NULLIF(${vendorProfiles.avgRating}, '0'), '0')::numeric`),
+      desc(sql<string>`COALESCE(${vendorProfiles.avgRating}, '0')::numeric`),
       desc(vehicles.createdAt)
     )
     .limit(limit)
@@ -379,4 +379,159 @@ export async function getFeaturedVehicles(limit = 8): Promise<FeaturedVehicleCar
       city: citiesByVehicle.get(v.id) ?? null,
     }
   })
+}
+/**
+ * Get unique makes, cities, and max price for filter sidebar.
+ */
+export async function getSearchMetadata() {
+  const [makes, cities, maxPriceRow] = await Promise.all([
+    db.selectDistinct({ make: vehicles.make }).from(vehicles).where(eq(vehicles.isActive, true)),
+    db.selectDistinct({ cityName: vehicleCities.cityName }).from(vehicleCities),
+    db.select({ 
+      maxPrice: sql<string>`MAX(LEAST(COALESCE(${vehicles.priceWithDriverDay}, 999999), COALESCE(${vehicles.priceSelfDriveDay}, 999999)))` 
+    }).from(vehicles).where(eq(vehicles.isActive, true))
+  ])
+
+  return {
+    makes: makes.map(m => m.make).filter(Boolean).sort(),
+    cities: cities.map(c => c.cityName).filter(Boolean).sort(),
+    maxPrice: maxPriceRow[0]?.maxPrice ? parseFloat(maxPriceRow[0].maxPrice) : 50000
+  }
+}
+
+export type VehicleSearchParams = {
+  make?: string[]
+  city?: string[]
+  minPrice?: number
+  maxPrice?: number
+  driveType?: 'SELF_DRIVE' | 'WITH_DRIVER' | 'BOTH'
+  query?: string
+  limit?: number
+  offset?: number
+}
+
+/**
+ * Generic search with multiple filters and optional location awareness.
+ */
+export async function searchVehiclesGeneric(params: VehicleSearchParams): Promise<FeaturedVehicleCard[]> {
+  const { 
+    make, city, minPrice, maxPrice, driveType, query, limit = 12, offset = 0 
+  } = params
+
+  const filters = [
+    eq(vehicles.isActive, true),
+    eq(vendorProfiles.verificationStatus, 'APPROVED')
+  ]
+
+  if (make && make.length > 0) {
+    filters.push(inArray(vehicles.make, make))
+  }
+
+  if (driveType === 'SELF_DRIVE') {
+    filters.push(eq(vehicles.selfDriveEnabled, true))
+  } else if (driveType === 'WITH_DRIVER') {
+    filters.push(eq(vehicles.withDriverEnabled, true))
+  }
+
+  if (query) {
+    filters.push(sql`${vehicles.name} ILIKE ${'%' + query + '%'}`)
+  }
+
+  // Join with cities if filtering by city
+  let baseQuery = db
+    .select({
+      vehicle: vehicles,
+      vendorSlug: vendorProfiles.publicSlug,
+      vendorName: vendorProfiles.businessName,
+      avgRating: vendorProfiles.avgRating,
+      totalReviews: vendorProfiles.totalReviews,
+    })
+    .from(vehicles)
+    .innerJoin(vendorProfiles, eq(vehicles.vendorId, vendorProfiles.id))
+
+  if (city && city.length > 0) {
+    baseQuery = baseQuery.innerJoin(vehicleCities, eq(vehicles.id, vehicleCities.vehicleId)) as any
+    filters.push(inArray(vehicleCities.cityName, city))
+  }
+
+  const rows = await baseQuery
+    .where(and(...filters))
+    .orderBy(
+      desc(sql<string>`COALESCE(${vendorProfiles.avgRating}, '0')::numeric`),
+      desc(vehicles.createdAt)
+    )
+    .limit(limit)
+    .offset(offset)
+
+  if (rows.length === 0) return []
+  const ids = rows.map((r) => r.vehicle.id)
+
+  const [imgRows, cityRows] = await Promise.all([
+    db
+      .select({
+        vehicleId: vehicleImages.vehicleId,
+        url: vehicleImages.url,
+        isCover: vehicleImages.isCover,
+        sortOrder: vehicleImages.sortOrder,
+      })
+      .from(vehicleImages)
+      .where(inArray(vehicleImages.vehicleId, ids)),
+    db
+      .select({
+        vehicleId: vehicleCities.vehicleId,
+        cityName: vehicleCities.cityName,
+      })
+      .from(vehicleCities)
+      .where(inArray(vehicleCities.vehicleId, ids)),
+  ])
+
+  const imagesByVehicle = new Map<
+    string,
+    Array<{ url: string; isCover: boolean; sortOrder: number }>
+  >()
+  for (const im of imgRows) {
+    const list = imagesByVehicle.get(im.vehicleId) ?? []
+    list.push(im)
+    imagesByVehicle.set(im.vehicleId, list)
+  }
+
+  const citiesByVehicle = new Map<string, string>()
+  for (const c of cityRows) {
+    if (!citiesByVehicle.has(c.vehicleId)) {
+      citiesByVehicle.set(c.vehicleId, c.cityName)
+    }
+  }
+
+  const results = rows.map((r) => {
+    const v = r.vehicle
+    const imgs = imagesByVehicle.get(v.id) ?? []
+    
+    // Price filter after DB query if it's complex, or we can add it to SQL if simple.
+    // For now we do a basic check.
+    const minDayPriceStr = minEnabledDayPrice(v)
+    const priceVal = minDayPriceStr ? parseFloat(minDayPriceStr) : null
+
+    if (minPrice !== undefined && priceVal !== null && priceVal < minPrice) return null
+    if (maxPrice !== undefined && priceVal !== null && priceVal > maxPrice) return null
+
+    return {
+      vehicleId: v.id,
+      vendorSlug: r.vendorSlug,
+      vendorName: r.vendorName ?? 'Vendor',
+      vehicleSlug: v.slug,
+      name: v.name,
+      make: v.make,
+      model: v.model,
+      year: v.year,
+      coverImageUrl: pickCoverUrl(imgs),
+      withDriverEnabled: v.withDriverEnabled,
+      selfDriveEnabled: v.selfDriveEnabled,
+      minDayPrice: minDayPriceStr,
+      avgRating: r.avgRating ?? '0',
+      totalReviews: r.totalReviews ?? 0,
+      city: citiesByVehicle.get(v.id) ?? null,
+    }
+  })
+
+  return results.filter(Boolean) as FeaturedVehicleCard[]
 }

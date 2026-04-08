@@ -7,15 +7,18 @@ export default async function VendorChatHubPage() {
   const rows = await listBookingChatsForVendor(user.id)
 
   return (
-    <div className="flex flex-col flex-1">
-      {/* Header */}
-      <div className="px-6 pt-6 pb-2 lg:px-8 bg-card/70 backdrop-blur-sm border-b border-border">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Messages</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">Secure conversations with customers</p>
-          </div>
-        </div>
+    <div className="flex flex-col flex-1 bg-gray-50/10">
+      {/* ─── Branded Header ─── */}
+      <div className="px-6 pt-10 pb-8 lg:px-12 border-b-4 border-[#0B1B3D] bg-white relative">
+         <div className="absolute -bottom-1 left-0 w-24 h-1.5 bg-[#F5A623]" />
+         
+         <div className="flex items-center gap-3 mb-2">
+            <div className="h-2 w-10 bg-[#F5A623]" />
+            <h2 className="text-[11px] font-black uppercase tracking-[0.4em] text-[#0B1B3D]/40 leading-none mt-0.5">Secure Comms</h2>
+         </div>
+         <h1 className="text-4xl font-black tracking-tighter text-[#0B1B3D] uppercase leading-none">
+            Member<span className="text-[#F5A623] italic">Connect</span>
+         </h1>
       </div>
 
       {/* Chat Panel */}

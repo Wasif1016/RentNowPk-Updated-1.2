@@ -3,10 +3,10 @@ import { format } from 'date-fns'
 import { CalendarCheck, Clock, CheckCircle, AlertCircle, Search } from 'lucide-react'
 import { getRequiredUser } from '@/lib/auth/session'
 import { getVendorBookingStats, getVendorBookingsList } from '@/lib/db/vendor-bookings'
-import { BookingStatusBadge } from '@/components/dashboard/booking-status-badge'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import { DashboardStatCard } from '@/components/dashboard/dashboard-stat-card'
+import { DashboardStatusBadge } from '@/components/dashboard/dashboard-status-badge'
 
 const VALID_STATUSES = ['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'REJECTED', 'EXPIRED'] as const
 const PAGE_SIZE = 20
@@ -45,153 +45,139 @@ export default async function VendorBookingsPage({
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   return (
-    <div className="px-6 pt-8 pb-10 lg:px-8">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Bookings</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage all rental requests, confirm or cancel bookings, and communicate with customers.
-          </p>
+    <div className="px-6 pt-10 pb-16 lg:px-12">
+      {/* ─── Branded Header ─── */}
+      <div className="mb-12">
+         <div className="flex items-center gap-3 mb-4">
+            <div className="h-2 w-10 bg-[#F5A623]" />
+            <h2 className="text-[11px] font-black uppercase tracking-[0.4em] text-[#0B1B3D]/40 leading-none mt-0.5">Inventory Operations</h2>
+         </div>
+         <h1 className="text-5xl font-black tracking-tighter text-[#0B1B3D] uppercase leading-none mb-4">
+            Booking<span className="text-[#F5A623] italic">Ledger</span>
+         </h1>
+         <p className="text-[12px] font-bold text-[#0B1B3D]/50 uppercase tracking-tight max-w-2xl leading-relaxed">
+            Monitor incoming requests, verify customer credentials, and maintain your rental schedule with precision.
+         </p>
+      </div>
+
+      {/* ─── Metric Strip ─── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
+        <DashboardStatCard
+          label="Total Pipeline"
+          value={String(stats.total)}
+          subtitle={`${stats.active} Currently active`}
+          icon={CalendarCheck}
+        />
+        <DashboardStatCard
+          label="Confirmed"
+          value={String(stats.active)}
+          subtitle="Revenue generating"
+          icon={Clock}
+        />
+        <DashboardStatCard
+          label="Closed Out"
+          value={String(stats.completed)}
+          subtitle="Past history"
+          icon={CheckCircle}
+        />
+        <DashboardStatCard
+          label="Priority Alerts"
+          value={String(stats.pending)}
+          subtitle={stats.pending > 0 ? "Review Required" : "All current"}
+          icon={AlertCircle}
+          className={stats.pending > 0 ? "border-[#F5A623]" : ""}
+        />
+      </div>
+
+      {/* ─── Data Controls ─── */}
+      <div className="flex flex-wrap items-center gap-3 mb-8">
+        <div className="bg-[#0B1B3D] p-1 rounded-sm flex flex-wrap gap-1 shadow-[4px_4px_0_rgba(0,0,0,0.1)]">
+          {FILTERS.map((f) => {
+            const isActive = statusFilter === f.key
+            return (
+              <Link
+                key={f.key}
+                href={f.key ? `/vendor/bookings?status=${f.key}` : '/vendor/bookings'}
+                scroll={false}
+              >
+                <div className={cn(
+                  "px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all rounded-sm",
+                  isActive 
+                    ? "bg-[#F5A623] text-[#0B1B3D] shadow-sm" 
+                    : "text-white/60 hover:text-white hover:bg-white/5"
+                )}>
+                  {f.label}
+                </div>
+              </Link>
+            )
+          })}
         </div>
       </div>
 
-      {/* Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <StatCard
-          label="Total Bookings"
-          value={String(stats.total)}
-          subtitle={`${stats.pending} pending review`}
-          icon={CalendarCheck}
-          iconBg="bg-blue-50"
-          iconColor="text-blue-600"
-        />
-        <StatCard
-          label="Active / Upcoming"
-          value={String(stats.active)}
-          subtitle={stats.active > 0 ? 'Currently renting' : 'No active rentals'}
-          icon={Clock}
-          iconBg="bg-amber-50"
-          iconColor="text-amber-600"
-        />
-        <StatCard
-          label="Completed"
-          value={String(stats.completed)}
-          subtitle="Successfully finished"
-          icon={CheckCircle}
-          iconBg="bg-green-50"
-          iconColor="text-green-600"
-        />
-        <StatCard
-          label="Pending Review"
-          value={String(stats.pending)}
-          subtitle={stats.pending > 0 ? 'Needs your attention' : 'All caught up'}
-          icon={AlertCircle}
-          iconBg="bg-purple-50"
-          iconColor="text-purple-600"
-        />
-      </div>
-
-      {/* Filter Tabs */}
-      <div className="flex flex-wrap gap-2 mb-6">
-        {FILTERS.map((f) => {
-          const isActive = statusFilter === f.key
-          return (
-            <Link
-              key={f.key}
-              href={f.key ? `/vendor/bookings?status=${f.key}` : '/vendor/bookings'}
-              scroll={false}
-            >
-              <Badge
-                variant={isActive ? 'default' : 'outline'}
-                className={cn(
-                  'cursor-pointer px-4 py-2 rounded-full text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-primary text-white border-primary shadow-sm'
-                    : 'bg-card text-muted-foreground border-border hover:bg-muted'
-                )}
-              >
-                {f.label}
-              </Badge>
-            </Link>
-          )
-        })}
-      </div>
-
-      {/* Bookings Table */}
-      <div className="rounded-xl bg-card border border-border shadow-sm overflow-hidden">
+      {/* ─── Booking Ledger Grid ─── */}
+      <div className="bg-white border-4 border-[#0B1B3D] rounded-sm shadow-[8px_8px_0_#0F1E32/5] overflow-hidden">
         {rows.length === 0 ? (
-          <div className="px-6 py-12 text-center">
-            <Search className="h-8 w-8 text-muted-foreground/40 mx-auto mb-3" />
-            <p className="text-muted-foreground text-sm">
+          <div className="px-6 py-24 text-center">
+            <Search className="h-12 w-12 text-[#0B1B3D]/10 mx-auto mb-6" strokeWidth={1} />
+            <p className="text-[#0B1B3D]/30 font-black uppercase tracking-[0.2em] text-xs italic">
               {statusFilter
-                ? `No ${statusFilter.toLowerCase()} bookings found.`
-                : 'No booking requests yet. When customers request your vehicles, they will appear here.'}
+                ? `Zero matches found for ${statusFilter.toLowerCase()} criteria.`
+                : 'Your booking ledger is currently empty.'}
             </p>
           </div>
         ) : (
           <>
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-border">
-                <thead className="bg-muted/50">
+              <table className="min-w-full divide-y-4 divide-[#0B1B3D]">
+                <thead className="bg-[#0B1B3D]">
                   <tr>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      Booking / Car
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      Customer
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      Dates & Location
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      Type
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-4 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      Actions
-                    </th>
+                    <th className="px-6 py-5 text-left text-[10px] font-black text-white uppercase tracking-[0.2em]">Vehicle / Reference</th>
+                    <th className="px-6 py-5 text-left text-[10px] font-black text-white uppercase tracking-[0.2em]">Customer</th>
+                    <th className="px-6 py-5 text-left text-[10px] font-black text-white uppercase tracking-[0.2em]">Logistics</th>
+                    <th className="px-6 py-5 text-left text-[10px] font-black text-white uppercase tracking-[0.2em]">Configuration</th>
+                    <th className="px-6 py-5 text-left text-[10px] font-black text-white uppercase tracking-[0.2em]">Status</th>
+                    <th className="px-6 py-5 text-right text-[10px] font-black text-white uppercase tracking-[0.2em]">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border bg-card">
+                <tbody className="divide-y-2 divide-[#0B1B3D]/5">
                   {rows.map((b) => (
-                    <tr key={b.bookingId} className="hover:bg-muted/30 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="font-medium text-foreground text-sm">
+                    <tr key={b.bookingId} className="hover:bg-gray-50/80 transition-colors group">
+                      <td className="px-6 py-6 whitespace-nowrap">
+                        <div className="font-black text-[#0B1B3D] text-sm uppercase tracking-tighter group-hover:text-[#F5A623] transition-colors">
                           {b.vehicleName}
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          {format(b.pickupAt, 'MMM d')} – {format(b.dropoffAt, 'MMM d, yyyy')}
+                        <div className="text-[10px] font-bold text-[#0B1B3D]/40 uppercase tracking-tight mt-1">
+                          Ref: #{b.bookingId.slice(-6).toUpperCase()}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-foreground">{b.customerName}</div>
+                      <td className="px-6 py-6 whitespace-nowrap">
+                        <div className="text-sm font-black text-[#0B1B3D] uppercase tracking-tighter">{b.customerName}</div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-muted-foreground">
-                          {b.pickupAddress ? (
-                            <span className="truncate block max-w-[200px]">{b.pickupAddress}</span>
-                          ) : (
-                            '—'
-                          )}
+                      <td className="px-6 py-6 whitespace-nowrap">
+                        <div className="text-[11px] font-bold text-[#0B1B3D] uppercase tracking-tight leading-none mb-1.5">
+                           {format(b.pickupAt, 'MMM d')} – {format(b.dropoffAt, 'MMM d, yyyy')}
+                        </div>
+                        <div className="text-[9px] font-bold text-[#0B1B3D]/40 uppercase tracking-tight truncate max-w-[180px]">
+                           {b.pickupAddress || 'No Address Logged'}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm text-muted-foreground">
-                          {b.driveType === 'SELF_DRIVE' ? 'Self Drive' : 'With Driver'}
-                        </span>
+                      <td className="px-6 py-6 whitespace-nowrap">
+                        <div className="inline-flex items-center gap-1.5 bg-[#F5A623]/5 border border-[#F5A623]/20 px-2 py-1 rounded-sm">
+                           <div className="h-1 w-1 bg-[#F5A623] rounded-full" />
+                           <span className="text-[9px] font-black text-[#0B1B3D] uppercase tracking-widest">
+                             {b.driveType === 'SELF_DRIVE' ? 'Self Drive' : 'Chauffeur'}
+                           </span>
+                        </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <BookingStatusBadge status={b.status} />
+                      <td className="px-6 py-6 whitespace-nowrap">
+                        <DashboardStatusBadge status={b.status} />
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <td className="px-6 py-6 whitespace-nowrap text-right">
                         <Link
                           href={`/vendor/chat/${b.bookingId}`}
-                          className="text-primary text-sm font-medium hover:underline"
+                          className="inline-flex items-center bg-[#0B1B3D] text-white px-5 py-2 rounded-sm text-[10px] font-black uppercase tracking-widest shadow-[3px_3px_0_#F5A623] hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none transition-all"
                         >
-                          {b.status === 'PENDING' ? 'Review' : 'Chat'}
+                          {b.status === 'PENDING' ? 'Operations' : 'Console'}
                         </Link>
                       </td>
                     </tr>
@@ -200,96 +186,55 @@ export default async function VendorBookingsPage({
               </table>
             </div>
 
-            {/* Pagination */}
+            {/* Branded Pagination */}
             {totalPages > 1 && (
-              <div className="px-6 py-4 border-t border-border flex justify-between items-center flex-wrap gap-3">
-                <p className="text-xs text-muted-foreground">
-                  Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} of {total} bookings
+              <div className="px-6 py-6 border-t-4 border-[#0B1B3D]/5 flex justify-between items-center bg-gray-50/30">
+                <p className="text-[10px] font-bold text-[#0B1B3D]/40 uppercase tracking-widest leading-none">
+                  Page <span className="text-[#0B1B3D]">{page}</span> of <span className="text-[#0B1B3D]">{totalPages}</span>
                 </p>
-                <div className="flex gap-1">
-                  {page > 1 && (
-                    <Link
-                      href={`/vendor/bookings?status=${statusFilter}&page=${page - 1}`}
-                      scroll={false}
-                    >
-                      <Button variant="outline" size="sm" className="rounded-lg text-sm">
-                        Previous
-                      </Button>
-                    </Link>
-                  )}
-                  {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-                    let pageNum: number
-                    if (totalPages <= 5) {
-                      pageNum = i + 1
-                    } else if (page <= 3) {
-                      pageNum = i + 1
-                    } else if (page >= totalPages - 2) {
-                      pageNum = totalPages - 4 + i
-                    } else {
-                      pageNum = page - 2 + i
-                    }
-                    return (
-                      <Link
-                        key={pageNum}
-                        href={`/vendor/bookings?status=${statusFilter}&page=${pageNum}`}
-                        scroll={false}
-                      >
-                        <Button
-                          variant={pageNum === page ? 'default' : 'outline'}
-                          size="sm"
-                          className="rounded-lg text-sm min-w-[2.25rem]"
-                        >
-                          {pageNum}
-                        </Button>
-                      </Link>
-                    )
-                  })}
-                  {page < totalPages && (
-                    <Link
-                      href={`/vendor/bookings?status=${statusFilter}&page=${page + 1}`}
-                      scroll={false}
-                    >
-                      <Button variant="outline" size="sm" className="rounded-lg text-sm">
-                        Next
-                      </Button>
-                    </Link>
-                  )}
+                <div className="flex gap-2">
+                  <Button asChild variant="outline" className={cn(
+                    "border-2 border-[#0B1B3D] rounded-sm text-[10px] font-black uppercase h-9 px-4 transition-all shadow-[2px_2px_0_#0F1E32]",
+                    page <= 1 && "opacity-30 cursor-not-allowed"
+                  )}>
+                    {page > 1 ? (
+                       <Link href={`/vendor/bookings?status=${statusFilter}&page=${page - 1}`} scroll={false}>Prev</Link>
+                    ) : (
+                       <span>Prev</span>
+                    )}
+                  </Button>
+                  
+                  <div className="flex gap-1 items-center px-1">
+                     {Array.from({ length: Math.min(totalPages, 3) }, (_, i) => {
+                        const pageNum = i + 1
+                        return (
+                           <Link key={pageNum} href={`/vendor/bookings?status=${statusFilter}&page=${pageNum}`} scroll={false}>
+                              <div className={cn(
+                                 "w-9 h-9 flex items-center justify-center text-[10px] font-black border-2 transition-all rounded-sm",
+                                 pageNum === page ? "bg-[#F5A623] border-[#0B1B3D] text-[#0B1B3D] shadow-[2px_2px_0_#0B1B3D]" : "border-[#0B1B3D]/10 text-[#0B1B3D] hover:border-[#0B1B3D]"
+                              )}>
+                                 {pageNum}
+                              </div>
+                           </Link>
+                        )
+                     })}
+                  </div>
+
+                  <Button asChild variant="outline" className={cn(
+                    "border-2 border-[#0B1B3D] rounded-sm text-[10px] font-black uppercase h-9 px-4 transition-all shadow-[2px_2px_0_#0F1E32]",
+                    page >= totalPages && "opacity-30 cursor-not-allowed"
+                  )}>
+                    {page < totalPages ? (
+                       <Link href={`/vendor/bookings?status=${statusFilter}&page=${page + 1}`} scroll={false}>Next</Link>
+                    ) : (
+                       <span>Next</span>
+                    )}
+                  </Button>
                 </div>
               </div>
             )}
           </>
         )}
-      </div>
-    </div>
-  )
-}
-
-function StatCard({
-  label,
-  value,
-  subtitle,
-  icon: Icon,
-  iconBg,
-  iconColor,
-}: {
-  label: string
-  value: string
-  subtitle: string
-  icon: React.ComponentType<{ className?: string }>
-  iconBg: string
-  iconColor: string
-}) {
-  return (
-    <div className="rounded-xl bg-card border border-border shadow-sm p-5 transition-shadow hover:shadow-md">
-      <div className="flex justify-between items-start">
-        <div>
-          <p className="text-sm font-medium text-muted-foreground">{label}</p>
-          <p className="text-2xl font-bold text-foreground mt-1 tabular-nums">{value}</p>
-          <span className="text-xs text-muted-foreground mt-2 inline-block">{subtitle}</span>
-        </div>
-        <div className={`h-10 w-10 rounded-xl ${iconBg} flex items-center justify-center ${iconColor}`}>
-          <Icon className="h-5 w-5" />
-        </div>
       </div>
     </div>
   )

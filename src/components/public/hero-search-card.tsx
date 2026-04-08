@@ -12,18 +12,42 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
-export function HeroSearchCard() {
+interface HeroSearchCardProps {
+  initialPickupPlaceId?: string
+  initialDropoffPlaceId?: string
+  initialRadiusKm?: string
+  initialPickupAddress?: string
+  initialDropoffAddress?: string
+}
+
+export function HeroSearchCard({
+  initialPickupPlaceId = '',
+  initialDropoffPlaceId = '',
+  initialRadiusKm = '50',
+  initialPickupAddress = '',
+  initialDropoffAddress = ''
+}: HeroSearchCardProps) {
   const router = useRouter()
   const pickupRef = useRef<HTMLInputElement>(null)
   const dropRef = useRef<HTMLInputElement>(null)
   const acPickupRef = useRef<google.maps.places.Autocomplete | null>(null)
   const acDropRef = useRef<google.maps.places.Autocomplete | null>(null)
 
-  const [pickupPlaceId, setPickupPlaceId] = useState('')
-  const [dropoffPlaceId, setDropoffPlaceId] = useState('')
-  const [radiusKm, setRadiusKm] = useState('50')
+  const [pickupPlaceId, setPickupPlaceId] = useState(initialPickupPlaceId)
+  const [dropoffPlaceId, setDropoffPlaceId] = useState(initialDropoffPlaceId)
+  const [radiusKm, setRadiusKm] = useState(initialRadiusKm)
   const [mapsReady, setMapsReady] = useState(false)
   const [isLocating, setIsLocating] = useState(false)
+
+  // Initialize input values if addresses are provided
+  useEffect(() => {
+    if (pickupRef.current && initialPickupAddress) {
+      pickupRef.current.value = initialPickupAddress
+    }
+    if (dropRef.current && initialDropoffAddress) {
+      dropRef.current.value = initialDropoffAddress
+    }
+  }, [initialPickupAddress, initialDropoffAddress])
 
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim()
 
@@ -164,7 +188,7 @@ export function HeroSearchCard() {
           </div>
 
           {/* Radius */}
-          <div className="lg:col-span-2 flex flex-col gap-1.5">
+          <div className="lg:col-span-2 flex flex-col mt-2 gap-1.5">
             <label className="text-[10px] md:text-[11px] font-bold text-[#0B1B3D] tracking-wider uppercase ml-1">
               Search Radius
             </label>
