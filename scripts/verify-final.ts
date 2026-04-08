@@ -4,7 +4,12 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 async function main() {
-  const url = process.env.DATABASE_URL.split('?')[0];
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    console.error('DATABASE_URL is not defined');
+    return;
+  }
+  const url = databaseUrl.split('?')[0];
   const sql = postgres(url);
   try {
     const columns = await sql`
