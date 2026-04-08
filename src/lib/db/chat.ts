@@ -11,6 +11,7 @@ import {
 import { alias } from 'drizzle-orm/pg-core'
 import { db } from '@/lib/db'
 import {
+  bookingOffers,
   bookings,
   chatThreads,
   messages,
@@ -75,13 +76,23 @@ export type ChatMessageDto = {
   threadId: string
   senderId: string
   content: string | null
-  messageType: 'TEXT' | 'AUDIO'
+  messageType: 'TEXT' | 'AUDIO' | 'OFFER' | 'IMAGE'
   mediaUrl: string | null
   audioDuration: number | null
   createdAt: string
   editedAt: string | null
   deliveredAt: string | null
   seenAt: string | null
+  offer?: {
+    id: string
+    vehicleId: string
+    vehicleName: string
+    pricePerDay: string
+    totalPrice: string
+    note: string | null
+    status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED'
+    senderId: string | null
+  } | null
 }
 
 export type MessageCursor = {
@@ -186,8 +197,19 @@ export async function loadMessagesPage(
       editedAt: messages.editedAt,
       deliveredAt: messages.deliveredAt,
       seenAt: messages.seenAt,
+      // Joined offer data
+      offerId: bookingOffers.id,
+      offerVehicleId: bookingOffers.vehicleId,
+      offerVehicleName: vehicles.name,
+      offerPricePerDay: bookingOffers.pricePerDay,
+      offerTotalPrice: bookingOffers.totalPrice,
+      offerNote: bookingOffers.note,
+      offerStatus: bookingOffers.status,
+      offerSenderId: bookingOffers.senderId,
     })
     .from(messages)
+    .leftJoin(bookingOffers, eq(messages.offerId, bookingOffers.id))
+    .leftJoin(vehicles, eq(bookingOffers.vehicleId, vehicles.id))
     .where(and(...conditions))
     .orderBy(desc(messages.createdAt), desc(messages.id))
     .limit(PAGE + 1)
@@ -210,13 +232,23 @@ export async function loadMessagesPage(
       threadId: m.threadId,
       senderId: m.senderId,
       content: m.content,
-      messageType: m.messageType as 'TEXT' | 'AUDIO',
+      messageType: m.messageType as 'TEXT' | 'AUDIO' | 'OFFER' | 'IMAGE',
       mediaUrl: m.mediaUrl,
       audioDuration: m.audioDuration,
       createdAt: m.createdAt.toISOString(),
       editedAt: m.editedAt ? m.editedAt.toISOString() : null,
       deliveredAt: m.deliveredAt ? m.deliveredAt.toISOString() : null,
       seenAt: m.seenAt ? m.seenAt.toISOString() : null,
+      offer: m.offerId ? {
+        id: m.offerId,
+        vehicleId: m.offerVehicleId!,
+        vehicleName: m.offerVehicleName!,
+        pricePerDay: m.offerPricePerDay!,
+        totalPrice: m.offerTotalPrice!,
+        note: m.offerNote,
+        status: m.offerStatus!,
+        senderId: m.offerSenderId,
+      } : null,
     })),
     nextCursor,
   }
@@ -494,7 +526,7 @@ export async function listBookingChatsForVendor(
   }))
 }
 
-async function getUnreadCountsByThreadIdForAdmin(
+export async function getUnreadCountsByThreadIdForAdmin(
   pairs: { threadId: string; userId: string }[]
 ): Promise<Map<string, number>> {
   const out = new Map<string, number>()
@@ -502,4 +534,19 @@ async function getUnreadCountsByThreadIdForAdmin(
     out.set(threadId, await getTotalUnreadForUser(userId))
   }
   return out
+}
+
+export async function getVendorFleetForBooking(bookingId: string): Promise<{ id: string, name: string }[]> {
+  const [row] = await db
+    .select({ vendorId: bookings.vendorId })
+    .from(bookings)
+    .where(eq(bookings.id, bookingId))
+    .limit(1)
+
+  if (!row) return []
+
+  return db
+    .select({ id: vehicles.id, name: vehicles.name })
+    .from(vehicles)
+    .where(and(eq(vehicles.vendorId, row.vendorId), eq(vehicles.isActive, true)))
 }

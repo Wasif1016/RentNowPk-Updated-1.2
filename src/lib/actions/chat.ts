@@ -182,7 +182,7 @@ export async function sendChatMessage(
     threadId: inserted.threadId,
     senderId: inserted.senderId,
     content: inserted.content,
-    messageType: inserted.messageType as 'TEXT' | 'AUDIO',
+    messageType: inserted.messageType as 'TEXT' | 'AUDIO' | 'OFFER' | 'IMAGE',
     mediaUrl: inserted.mediaUrl,
     audioDuration: inserted.audioDuration,
     createdAt: inserted.createdAt.toISOString(),
@@ -261,7 +261,7 @@ export async function editChatMessage(
       threadId: updated.threadId,
       senderId: updated.senderId,
       content: updated.content,
-      messageType: updated.messageType as 'TEXT' | 'AUDIO',
+      messageType: updated.messageType as 'TEXT' | 'AUDIO' | 'OFFER' | 'IMAGE',
       mediaUrl: updated.mediaUrl,
       audioDuration: updated.audioDuration,
       createdAt: updated.createdAt.toISOString(),
@@ -373,7 +373,7 @@ export async function adminSendChatMessage(
     threadId: inserted.threadId,
     senderId: inserted.senderId,
     content: inserted.content,
-    messageType: inserted.messageType as 'TEXT' | 'AUDIO',
+    messageType: inserted.messageType as 'TEXT' | 'AUDIO' | 'OFFER' | 'IMAGE',
     mediaUrl: inserted.mediaUrl,
     audioDuration: inserted.audioDuration,
     createdAt: inserted.createdAt.toISOString(),
@@ -474,7 +474,7 @@ export async function sendVoiceMessage(
       threadId: inserted.threadId,
       senderId: inserted.senderId,
       content: inserted.content,
-      messageType: inserted.messageType as 'TEXT' | 'AUDIO',
+      messageType: inserted.messageType as 'TEXT' | 'AUDIO' | 'OFFER' | 'IMAGE',
       mediaUrl: inserted.mediaUrl,
       audioDuration: inserted.audioDuration,
       createdAt: inserted.createdAt.toISOString(),
@@ -490,5 +490,108 @@ export async function sendVoiceMessage(
   } catch (err) {
     console.error('[sendVoiceMessage] Error:', err)
     return { ok: false, error: 'Failed to send voice message.' }
+  }
+}
+
+export async function sendImageMessage(
+  bookingId: string,
+  base64Image: string
+): Promise<SendChatMessageResult> {
+  const user = await requireCustomerOrVendor()
+  const ctx =
+    user.role === 'ADMIN'
+      ? await getAdminChatContextForBooking({ bookingId })
+      : await getChatContextForBooking({
+          bookingId,
+          userId: user.id,
+        })
+
+  if (!ctx) {
+    return { ok: false, error: 'Chat not found.' }
+  }
+
+  const isAdmin = user.role === 'ADMIN'
+
+  try {
+    if (!process.env.CLOUDINARY_CLOUD_NAME) {
+       console.error('[sendImageMessage] CLOUDINARY_CLOUD_NAME is missing')
+       return { ok: false, error: 'Cloudinary is not configured.' }
+    }
+
+    // Upload to Cloudinary
+    const folder = `rentnowpk/chats/${ctx.threadId}`
+    const result = await cloudinary.uploader.upload(base64Image, {
+      folder,
+      resource_type: 'image',
+      overwrite: true,
+    })
+
+    if (!result.secure_url) {
+      throw new Error('Upload failed: No secure_url returned')
+    }
+
+    const now = new Date()
+    const [inserted] = await db
+      .insert(messages)
+      .values({
+        threadId: ctx.threadId,
+        senderId: user.id,
+        content: null,
+        messageType: 'IMAGE',
+        mediaUrl: result.secure_url,
+        createdAt: now,
+        deliveredAt: now,
+      })
+      .returning({
+        id: messages.id,
+        threadId: messages.threadId,
+        senderId: messages.senderId,
+        content: messages.content,
+        messageType: messages.messageType,
+        mediaUrl: messages.mediaUrl,
+        audioDuration: messages.audioDuration,
+        createdAt: messages.createdAt,
+        deliveredAt: messages.deliveredAt,
+        seenAt: messages.seenAt,
+      })
+
+    await db
+      .update(chatThreads)
+      .set({ lastMessageAt: now })
+      .where(eq(chatThreads.id, ctx.threadId))
+
+    updateTag(bookingTag(bookingId))
+    updateTag(customerBookingsTag(ctx.customerUserId))
+    updateTag(vendorBookingsTag(ctx.vendorUserId))
+
+    if (isAdmin) {
+      updateTag(unreadMessagesTag(ctx.customerUserId))
+      updateTag(unreadMessagesTag(ctx.vendorUserId))
+    } else {
+      const recipientUserId = user.id === ctx.customerUserId ? ctx.vendorUserId : ctx.customerUserId
+      updateTag(unreadMessagesTag(recipientUserId))
+    }
+
+    const dto: ChatMessageDto = {
+      id: inserted.id,
+      threadId: inserted.threadId,
+      senderId: inserted.senderId,
+      content: inserted.content,
+      messageType: inserted.messageType as 'TEXT' | 'AUDIO' | 'OFFER' | 'IMAGE',
+      mediaUrl: inserted.mediaUrl,
+      audioDuration: inserted.audioDuration,
+      createdAt: inserted.createdAt.toISOString(),
+      editedAt: null,
+      deliveredAt: inserted.deliveredAt ? inserted.deliveredAt.toISOString() : null,
+      seenAt: inserted.seenAt ? inserted.seenAt.toISOString() : null,
+    }
+
+    // Broadcast to realtime channel for immediate UI delivery
+    void broadcastChatEvent(ctx.threadId, 'INSERT', dtoToBroadcastPayload(dto))
+
+    return { ok: true, message: dto }
+  } catch (err) {
+    console.error('[sendImageMessage] Error:', err)
+    return { ok: false, error: 'Failed to send image.' }
   }
 }

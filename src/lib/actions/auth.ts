@@ -53,7 +53,10 @@ export type ActionResult<T = void> =
   | { success: true; data?: T }
   | { success: false; error: string }
 
-export async function loginAction(formData: FormData): Promise<LoginActionResult> {
+export async function loginAction(
+  _prevState: any,
+  formData: FormData
+): Promise<LoginActionResult> {
   const nextRaw = formData.get('next')
   const next = typeof nextRaw === 'string' ? nextRaw : null
 
@@ -143,7 +146,10 @@ export async function getOAuthSignInUrl(
   return { success: true, data: { url: data.url } }
 }
 
-export async function resetPasswordAction(formData: FormData): Promise<ActionResult> {
+export async function resetPasswordAction(
+  _prevState: any,
+  formData: FormData
+): Promise<ActionResult> {
   const email = formData.get('email')
 
   if (!email || typeof email !== 'string') {

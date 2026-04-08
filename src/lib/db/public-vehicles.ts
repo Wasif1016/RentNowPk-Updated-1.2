@@ -3,6 +3,8 @@ import 'server-only'
 import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import {
+  reviews,
+  users,
   vehicleCities,
   vehicleImages,
   vehicles,
@@ -41,9 +43,17 @@ export type PublicVehicleDetail = {
     avgRating: string
     totalReviews: number
     businessLogoUrl: string | null
+    createdAt: Date
   }
   images: PublicVehicleImage[]
   cities: string[]
+  reviews: {
+    id: string
+    rating: number
+    comment: string | null
+    createdAt: Date
+    customerName: string
+  }[]
 }
 
 export type PublicVehicleCard = {
@@ -95,6 +105,7 @@ export async function getPublicVehicleDetail(
         avgRating: vendorProfiles.avgRating,
         totalReviews: vendorProfiles.totalReviews,
         businessLogoUrl: vendorProfiles.businessLogoUrl,
+        createdAt: vendorProfiles.createdAt,
       },
     })
     .from(vehicles)
@@ -113,7 +124,7 @@ export async function getPublicVehicleDetail(
 
   const vid = row.vehicle.id
 
-  const [imgs, cityRows] = await Promise.all([
+  const [imgs, cityRows, reviewRows] = await Promise.all([
     db
       .select({
         id: vehicleImages.id,
@@ -128,6 +139,19 @@ export async function getPublicVehicleDetail(
       .select({ cityName: vehicleCities.cityName })
       .from(vehicleCities)
       .where(eq(vehicleCities.vehicleId, vid)),
+    db
+      .select({
+        id: reviews.id,
+        rating: reviews.rating,
+        comment: reviews.comment,
+        createdAt: reviews.createdAt,
+        customerName: users.fullName,
+      })
+      .from(reviews)
+      .innerJoin(users, eq(reviews.customerUserId, users.id))
+      .where(eq(reviews.vehicleId, vid))
+      .orderBy(desc(reviews.createdAt))
+      .limit(10),
   ])
 
   const v = row.vehicle
@@ -151,6 +175,10 @@ export async function getPublicVehicleDetail(
     vendor: row.vendor,
     images: imgs,
     cities: cityRows.map((c) => c.cityName),
+    reviews: reviewRows.map((r) => ({
+      ...r,
+      customerName: r.customerName || 'Anonymous',
+    })),
   }
 }
 
@@ -249,6 +277,7 @@ export async function searchPublicVehiclesNearPickup(params: {
 export type FeaturedVehicleCard = {
   vehicleId: string
   vendorSlug: string
+  vendorName: string
   vehicleSlug: string
   name: string
   make: string
@@ -260,6 +289,7 @@ export type FeaturedVehicleCard = {
   minDayPrice: string | null
   avgRating: string
   totalReviews: number
+  city: string | null
 }
 
 /**
@@ -271,6 +301,7 @@ export async function getFeaturedVehicles(limit = 8): Promise<FeaturedVehicleCar
     .select({
       vehicle: vehicles,
       vendorSlug: vendorProfiles.publicSlug,
+      vendorName: vendorProfiles.businessName,
       avgRating: vendorProfiles.avgRating,
       totalReviews: vendorProfiles.totalReviews,
     })
@@ -289,18 +320,26 @@ export async function getFeaturedVehicles(limit = 8): Promise<FeaturedVehicleCar
     .limit(limit)
 
   if (rows.length === 0) return []
-
   const ids = rows.map((r) => r.vehicle.id)
 
-  const imgRows = await db
-    .select({
-      vehicleId: vehicleImages.vehicleId,
-      url: vehicleImages.url,
-      isCover: vehicleImages.isCover,
-      sortOrder: vehicleImages.sortOrder,
-    })
-    .from(vehicleImages)
-    .where(inArray(vehicleImages.vehicleId, ids))
+  const [imgRows, cityRows] = await Promise.all([
+    db
+      .select({
+        vehicleId: vehicleImages.vehicleId,
+        url: vehicleImages.url,
+        isCover: vehicleImages.isCover,
+        sortOrder: vehicleImages.sortOrder,
+      })
+      .from(vehicleImages)
+      .where(inArray(vehicleImages.vehicleId, ids)),
+    db
+      .select({
+        vehicleId: vehicleCities.vehicleId,
+        cityName: vehicleCities.cityName,
+      })
+      .from(vehicleCities)
+      .where(inArray(vehicleCities.vehicleId, ids)),
+  ])
 
   const imagesByVehicle = new Map<
     string,
@@ -312,12 +351,20 @@ export async function getFeaturedVehicles(limit = 8): Promise<FeaturedVehicleCar
     imagesByVehicle.set(im.vehicleId, list)
   }
 
+  const citiesByVehicle = new Map<string, string>()
+  for (const c of cityRows) {
+    if (!citiesByVehicle.has(c.vehicleId)) {
+      citiesByVehicle.set(c.vehicleId, c.cityName)
+    }
+  }
+
   return rows.map((r) => {
     const v = r.vehicle
     const imgs = imagesByVehicle.get(v.id) ?? []
     return {
       vehicleId: v.id,
       vendorSlug: r.vendorSlug,
+      vendorName: r.vendorName ?? 'Vendor',
       vehicleSlug: v.slug,
       name: v.name,
       make: v.make,
@@ -329,6 +376,7 @@ export async function getFeaturedVehicles(limit = 8): Promise<FeaturedVehicleCar
       minDayPrice: minEnabledDayPrice(v),
       avgRating: r.avgRating ?? '0',
       totalReviews: r.totalReviews ?? 0,
+      city: citiesByVehicle.get(v.id) ?? null,
     }
   })
 }

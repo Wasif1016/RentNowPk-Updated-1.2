@@ -30,9 +30,10 @@ function parseBroadcastRecord(payload: unknown): ChatMessageDto | null {
   const threadId = rec.thread_id
   const senderId = rec.sender_id
   const content = rec.content as string | null
-  const messageType = (rec.message_type as 'TEXT' | 'AUDIO') || 'TEXT'
+  const messageType = (rec.message_type as 'TEXT' | 'AUDIO' | 'OFFER' | 'IMAGE') || 'TEXT'
   const mediaUrl = rec.media_url as string | null
   const audioDuration = typeof rec.audio_duration === 'number' ? rec.audio_duration : null
+  const offer = rec.offer as any | null
   const createdAt = rec.created_at
   const deliveredAt = rec.delivered_at
   const seenAt = rec.seen_at
@@ -74,68 +75,45 @@ function parseBroadcastRecord(payload: unknown): ChatMessageDto | null {
     editedAt: null,
     deliveredAt: delivered,
     seenAt: seen,
+    offer: offer ? {
+      id: offer.id,
+      vehicleId: offer.vehicle_id,
+      vehicleName: offer.vehicle_name,
+      pricePerDay: offer.price_per_day,
+      totalPrice: offer.total_price,
+      note: offer.note,
+      status: offer.status,
+      senderId: offer.sender_id,
+    } : null,
   }
 }
 
-/** Thin wrapper around a Web Audio API generated tone (no asset needed). */
+/** Native sound from file. */
 let _notifyAudio: HTMLAudioElement | null = null
-
-function encodeWav(samples: Float32Array, sampleRate: number): ArrayBuffer {
-  const numChannels = 1
-  const bitsPerSample = 16
-  const bytesPerSample = bitsPerSample / 8
-  const blockAlign = numChannels * bytesPerSample
-  const byteRate = sampleRate * blockAlign
-  const dataSize = samples.length * bytesPerSample
-  const headerSize = 44
-  const buffer = new ArrayBuffer(headerSize + dataSize)
-  const view = new DataView(buffer)
-
-  // RIFF header
-  const writeStr = (offset: number, s: string) => {
-    for (let i = 0; i < s.length; i++) view.setUint8(offset + i, s.charCodeAt(i))
-  }
-  writeStr(0, 'RIFF')
-  view.setUint32(4, 36 + dataSize, true)
-  writeStr(8, 'WAVE')
-  // fmt chunk
-  writeStr(12, 'fmt ')
-  view.setUint32(16, 16, true)
-  view.setUint16(20, 1, true) // PCM
-  view.setUint16(22, numChannels, true)
-  view.setUint32(24, sampleRate, true)
-  view.setUint32(28, byteRate, true)
-  view.setUint16(32, blockAlign, true)
-  view.setUint16(34, bitsPerSample, true)
-  // data chunk
-  writeStr(36, 'data')
-  view.setUint32(40, dataSize, true)
-  // int16 PCM samples
-  let offset = 44
-  for (let i = 0; i < samples.length; i++) {
-    const s = Math.max(-1, Math.min(1, samples[i])) * 0.8
-    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true)
-    offset += 2
-  }
-  return buffer
-}
 
 function getNotifySound(): HTMLAudioElement {
   if (!_notifyAudio) {
-    const ctx = new AudioContext()
-    const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.12), ctx.sampleRate)
-    const data = buf.getChannelData(0)
-    for (let i = 0; i < data.length; i++) {
-      const t = i / data.length
-      const env = t < 0.1 ? t / 0.1 : t > 0.5 ? (1 - t) / 0.5 : 1
-      data[i] = Math.sin(2 * Math.PI * 440 * (i / ctx.sampleRate)) * env * 0.25
-    }
-    ctx.close()
-    const wav = encodeWav(data, buf.sampleRate)
-    const blob = new Blob([wav], { type: 'audio/wav' })
-    _notifyAudio = new Audio(URL.createObjectURL(blob))
+    _notifyAudio = new Audio('/NoteGPT_Speech_1775637613457.mp3')
   }
   return _notifyAudio
+}
+
+async function showBrowserNotification(msg: ChatMessageDto) {
+  if (typeof window === 'undefined' || !('Notification' in window)) return
+  if (Notification.permission !== 'granted') return
+
+  const title = `New Message`
+  const body = msg.messageType === 'TEXT' ? msg.content : `Sent a ${msg.messageType.toLowerCase()}`
+  
+  try {
+    new Notification(title, {
+      body: body || 'You have a new message',
+      icon: '/favicon.ico', // Universal fallback
+      tag: msg.threadId, // Coalesce notifications for the same thread
+    })
+  } catch (err) {
+    console.warn('Failed to show notification:', err)
+  }
 }
 
 export function useBookingChat(options: {
@@ -156,6 +134,13 @@ export function useBookingChat(options: {
   const soundPlayedRef = useRef<Set<string>>(new Set())
   const channelRef = useRef<RealtimeChannel | null>(null)
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Permission request
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+      void Notification.requestPermission()
+    }
+  }, [])
 
   useEffect(() => {
     idsRef.current = new Set(initialMessages.map((m) => m.id))
@@ -272,13 +257,17 @@ export function useBookingChat(options: {
         
         if (
           dto.senderId !== currentUserId &&
-          !soundPlayedRef.current.has(dto.id) &&
-          document.visibilityState === 'visible'
+          !soundPlayedRef.current.has(dto.id)
         ) {
           soundPlayedRef.current.add(dto.id)
           try {
             getNotifySound().play().catch(() => {})
           } catch {}
+          
+          // Only show notification if tab is hidden OR not focusing this thread
+          if (document.visibilityState !== 'visible') {
+            void showBrowserNotification(dto)
+          }
         }
 
         setMessages((prev) => {

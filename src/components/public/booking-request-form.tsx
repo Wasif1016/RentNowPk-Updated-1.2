@@ -56,7 +56,7 @@ async function loginFormAction(
   _prev: LoginActionResult | null,
   formData: FormData
 ): Promise<LoginActionResult> {
-  return loginAction(formData)
+  return loginAction(_prev, formData)
 }
 
 async function signupFormAction(

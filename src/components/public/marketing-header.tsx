@@ -21,14 +21,14 @@ export async function MarketingHeader() {
   const user = await getOptionalUser()
 
   return (
-    <header className="fixed top-0 z-50 w-full bg-white/95 backdrop-blur-sm border-b border-gray-100">
+    <header className="fixed top-0 z-50 w-full bg-[#0B1F3A] border-b border-[rgba(255,255,255,0.08)]">
       <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-4 h-16 sm:px-6 lg:px-8">
         {/* Logo */}
         <Link
           href="/"
-          className="text-xl font-extrabold tracking-tight text-primary shrink-0"
+          className="text-xl font-bold tracking-[0.05em] text-[#F5A623] shrink-0"
         >
-          RentNowPk
+          RENTNOWPK
         </Link>
 
         {/* Center nav */}
@@ -38,13 +38,13 @@ export async function MarketingHeader() {
         >
           <Link
             href="/search"
-            className="text-sm font-medium text-gray-700 hover:text-primary transition-colors"
+            className="text-xs font-bold uppercase tracking-[0.08em] text-[rgba(255,255,255,0.6)] hover:text-[#F5A623] transition-colors"
           >
-            Explore
+            Cars
           </Link>
           <Link
             href="/for-vendors"
-            className="text-sm font-medium text-gray-700 hover:text-primary transition-colors"
+            className="text-xs font-bold uppercase tracking-[0.08em] text-[rgba(255,255,255,0.6)] hover:text-[#F5A623] transition-colors"
           >
             List your car
           </Link>
@@ -55,7 +55,7 @@ export async function MarketingHeader() {
           {user ? (
             <>
               <span
-                className="hidden max-w-[140px] truncate text-sm text-gray-600 lg:inline"
+                className="hidden max-w-[140px] truncate text-xs text-[rgba(255,255,255,0.6)] lg:inline"
                 title={user.email}
               >
                 {user.fullName}
@@ -64,11 +64,10 @@ export async function MarketingHeader() {
                 variant="outline"
                 size="sm"
                 asChild
-                className="h-9 rounded-full text-sm font-medium border-gray-300"
+                className="h-9 rounded-lg text-xs font-bold uppercase tracking-[0.05em] bg-[#F5A623] text-black border-none hover:bg-[#D4880F]"
               >
                 <Link href={defaultPathForRole(user.role as AppRole)}>
-                  <span className="hidden sm:inline">{dashboardLabel(user.role as AppRole)}</span>
-                  <span className="sm:hidden">Dashboard</span>
+                  Dashboard
                 </Link>
               </Button>
               <form action={logoutAction}>
@@ -76,7 +75,7 @@ export async function MarketingHeader() {
                   type="submit"
                   variant="ghost"
                   size="sm"
-                  className="h-9 text-sm text-gray-600"
+                  className="h-9 text-xs text-[rgba(255,255,255,0.6)] hover:text-[#F5A623]"
                 >
                   Sign out
                 </Button>
@@ -88,16 +87,16 @@ export async function MarketingHeader() {
                 variant="ghost"
                 size="sm"
                 asChild
-                className="h-9 rounded-full px-4 text-sm font-medium text-gray-700 hover:bg-gray-100"
+                className="h-9 rounded-lg px-4 text-xs font-bold uppercase tracking-[0.05em] text-[rgba(255,255,255,0.6)] hover:text-[#F5A623]"
               >
-                <Link href="/auth/login">Log in</Link>
+                <Link href="/auth/login">Sign in</Link>
               </Button>
               <Button
                 size="sm"
                 asChild
-                className="h-9 rounded-full px-5 text-sm font-semibold bg-primary hover:bg-primary/90 text-white"
+                className="h-9 rounded-lg px-5 text-xs font-bold uppercase tracking-[0.05em] bg-[#F5A623] text-black border-none hover:bg-[#D4880F]"
               >
-                <Link href="/auth/signup">Sign up</Link>
+                <Link href="/auth/signup">List your car</Link>
               </Button>
             </>
           )}

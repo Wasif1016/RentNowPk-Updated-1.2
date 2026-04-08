@@ -1,11 +1,23 @@
-import Image from 'next/image'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { BookingRequestForm } from '@/components/public/booking-request-form'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { BookingSidebar } from '@/components/public/booking-sidebar'
+import { VehicleGallery } from '@/components/public/vehicle-gallery'
+import { RecommendedSection } from '@/components/public/recommended-section'
 import { getCustomerBookingPrefill } from '@/lib/db/customer-profile'
 import { getCachedPublicVehicleDetail } from '@/lib/db/public-vehicle-cached'
 import { getOptionalUser } from '@/lib/auth/session'
+import { cn } from '@/lib/utils'
+import { 
+  Star, 
+  MapPin, 
+  ChevronRight, 
+  Calendar, 
+  Car, 
+  UserCheck, 
+  Settings,
+  CircleCheck
+} from 'lucide-react'
+import { format } from 'date-fns'
 
 function formatPkMoney(decimal: string | null): string {
   if (!decimal) return '—'
@@ -51,149 +63,198 @@ export default async function PublicVehiclePage({
   const queryStrings: string[] = []
   if (rawSearch.pickupPlaceId) queryStrings.push(`pickupPlaceId=${encodeURIComponent(Array.isArray(rawSearch.pickupPlaceId) ? rawSearch.pickupPlaceId[0] : rawSearch.pickupPlaceId)}`)
   if (rawSearch.dropoffPlaceId) queryStrings.push(`dropoffPlaceId=${encodeURIComponent(Array.isArray(rawSearch.dropoffPlaceId) ? rawSearch.dropoffPlaceId[0] : rawSearch.dropoffPlaceId)}`)
-  if (rawSearch.pickupAddress) queryStrings.push(`pickupAddress=${encodeURIComponent(Array.isArray(rawSearch.pickupAddress) ? rawSearch.pickupAddress[0] : rawSearch.pickupAddress)}`)
-  if (rawSearch.dropoffAddress) queryStrings.push(`dropoffAddress=${encodeURIComponent(Array.isArray(rawSearch.dropoffAddress) ? rawSearch.dropoffAddress[0] : rawSearch.dropoffAddress)}`)
-
+  
   const queryString = queryStrings.length > 0 ? `?${queryStrings.join('&')}` : ''
   const path = `/${vendorSlug}/${vehicleSlug}${queryString}`
 
+  const memberSince = format(new Date(detail.vendor.createdAt), 'MMMM yyyy')
+
   return (
-    <div className="container mx-auto max-w-5xl space-y-10 px-4 py-10">
-      <nav className="text-sm text-muted-foreground">
-        <Link href="/search" className="hover:text-foreground">
-          Search
-        </Link>
-        <span className="mx-2">/</span>
-        <span className="text-foreground">{detail.name}</span>
-      </nav>
+    <div className="flex flex-col min-h-screen bg-[#F9F9F9] font-sans">
+      <main className="max-w-[1440px] mx-auto px-4 sm:px-8 py-10 w-full">
+        {/* Breadcrumbs */}
+        <nav className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.1em] text-[#0B1B3D]/50 mb-8">
+          <Link href="/search" className="hover:text-[#F8991D] transition-colors">Fleet</Link>
+          <ChevronRight className="h-3 w-3" />
+          <span className="text-[#0B1B3D]">{detail.name}</span>
+        </nav>
 
-      <div className="grid gap-8 lg:grid-cols-5">
-        <div className="space-y-4 lg:col-span-3">
-          <div className="relative aspect-[16/10] overflow-hidden rounded-xl border border-border bg-muted">
-            {detail.images[0]?.url ? (
-              <Image
-                src={detail.images[0].url}
-                alt=""
-                fill
-                className="object-cover"
-                priority
-                sizes="(max-width:1024px) 100vw, 60vw"
-              />
-            ) : (
-              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                No photos yet
+        {/* Column Wrapper - Form will stay inside here */}
+        <div className="flex flex-col lg:flex-row gap-12 items-start">
+          
+          {/* LEFT CONTENT: Gallery and Details */}
+          <div className="flex-1 space-y-12">
+            {/* Headline section */}
+            <section className="space-y-6">
+              <div>
+                <h1 className="text-4xl md:text-5xl font-black text-[#0B1B3D] tracking-tight uppercase leading-tight">
+                  {detail.name}
+                </h1>
+                <div className="flex flex-wrap items-center gap-4 mt-4">
+                  <span className="bg-[#0B1B3D] text-white text-[10px] font-bold px-3 py-1 uppercase tracking-wider shadow-[2px_2px_0_#F8991D]">
+                    Verified Listing
+                  </span>
+                  <div className="flex items-center gap-2 text-[#0B1B3D] font-bold text-xs">
+                    <MapPin className="h-4 w-4 text-[#F8991D]" strokeWidth={2.5} />
+                    {detail.cities.join(' • ') || 'Available Statewide'}
+                  </div>
+                </div>
               </div>
+
+              {/* Client-side Gallery */}
+              <VehicleGallery images={detail.images} name={detail.name} />
+            </section>
+
+            {/* Specs Grid */}
+            <section className="space-y-6">
+              <h2 className="text-xl font-bold text-[#0B1B3D] uppercase tracking-wide border-l-4 border-[#F8991D] pl-4">
+                Specifications
+              </h2>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="bg-white border-2 border-[#0B1B3D] p-4 flex items-center gap-4 group hover:bg-[#0B1B3D] hover:text-white transition-all">
+                  <Calendar className="h-5 w-5 text-[#F8991D]" />
+                  <div>
+                    <div className="text-[9px] font-bold uppercase tracking-wider text-[#0B1B3D]/50 group-hover:text-white/50">Year</div>
+                    <div className="font-bold text-base">{detail.year}</div>
+                  </div>
+                </div>
+                <div className="bg-white border-2 border-[#0B1B3D] p-4 flex items-center gap-4 group hover:bg-[#0B1B3D] hover:text-white transition-all">
+                  <Car className="h-5 w-5 text-[#F8991D]" />
+                  <div>
+                    <div className="text-[9px] font-bold uppercase tracking-wider text-[#0B1B3D]/50 group-hover:text-white/50">Make</div>
+                    <div className="font-bold text-base">{detail.make}</div>
+                  </div>
+                </div>
+                <div className="bg-white border-2 border-[#0B1B3D] p-4 flex items-center gap-4 group hover:bg-[#0B1B3D] hover:text-white transition-all">
+                  <Settings className="h-5 w-5 text-[#F8991D]" />
+                  <div>
+                    <div className="text-[9px] font-bold uppercase tracking-wider text-[#0B1B3D]/50 group-hover:text-white/50">Model</div>
+                    <div className="font-bold text-base truncate max-w-[100px]">{detail.model}</div>
+                  </div>
+                </div>
+                <div className="bg-white border-2 border-[#0B1B3D] p-4 flex items-center gap-4 group hover:bg-[#0B1B3D] hover:text-white transition-all">
+                  <UserCheck className="h-5 w-5 text-[#F8991D]" />
+                  <div>
+                    <div className="text-[9px] font-bold uppercase tracking-wider text-[#0B1B3D]/50 group-hover:text-white/50">Service</div>
+                    <div className="font-bold text-[10px] uppercase">
+                      {detail.withDriverEnabled ? 'Driver' : ''}
+                      {detail.withDriverEnabled && detail.selfDriveEnabled ? ' & ' : ''}
+                      {detail.selfDriveEnabled ? 'Self' : ''}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* Vendor Info Section */}
+            <section className="bg-[#0B1B3D] p-8 border-4 border-[#0B1B3D] shadow-[8px_8px_0_#F8991D] text-white flex flex-col md:flex-row items-center gap-8">
+              <div className="relative shrink-0">
+                <div className="w-20 h-20 border-2 border-[#F8991D] relative z-10 overflow-hidden bg-white/10">
+                  {detail.vendor.businessLogoUrl ? (
+                    <img
+                      src={detail.vendor.businessLogoUrl}
+                      alt={detail.vendor.businessName}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center font-bold text-xl">
+                      {detail.vendor.businessName?.charAt(0)}
+                    </div>
+                  )}
+                </div>
+                <div className="absolute -top-2 -right-2 bg-[#F8991D] text-[#0B1B3D] p-1 shadow-lg border-2 border-[#0B1B3D]">
+                  <CircleCheck className="h-4 w-4" />
+                </div>
+              </div>
+
+              <div className="flex-1 text-center md:text-left">
+                <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mb-2">
+                  <h3 className="text-2xl font-black tracking-tight uppercase">{detail.vendor.businessName}</h3>
+                  <span className="bg-[#F8991D] text-[#0B1B3D] text-[9px] font-black px-2 py-0.5 uppercase">Verified</span>
+                </div>
+                <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 mb-4">
+                  <div className="flex items-center gap-1.5 text-[#F8991D]">
+                    <Star className="h-4 w-4 fill-[#F8991D]" />
+                    <span className="font-black text-sm">{parseFloat(detail.vendor.avgRating).toFixed(1)}</span>
+                    <span className="text-white/40 text-[10px] uppercase font-bold">({detail.vendor.totalReviews})</span>
+                  </div>
+                  <div className="text-[10px] font-bold uppercase text-white/40 tracking-wider">Since {memberSince}</div>
+                </div>
+                <Link 
+                  href={`/${vendorSlug}`}
+                  className="inline-block bg-white text-[#0B1B3D] font-bold px-6 py-2 border-2 border-white hover:bg-[#F8991D] hover:border-[#F8991D] transition-all uppercase text-xs"
+                >
+                  View Vendor
+                </Link>
+              </div>
+            </section>
+
+            {/* Reviews Section */}
+            {detail.reviews.length > 0 && (
+              <section className="space-y-6">
+                <h2 className="text-xl font-bold text-[#0B1B3D] uppercase tracking-wide border-l-4 border-[#F8991D] pl-4">
+                  Customer Experiences
+                </h2>
+                <div className="grid gap-4">
+                  {detail.reviews.map((rev) => (
+                    <div key={rev.id} className="bg-white border-2 border-[#0B1B3D]/10 p-6 hover:border-[#0B1B3D] transition-colors">
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="flex gap-3 items-center">
+                          <div className="w-10 h-10 bg-[#0B1B3D] text-white flex items-center justify-center font-bold text-lg border-2 border-[#0B1B3D]">
+                            {rev.customerName.charAt(0)}
+                          </div>
+                          <div>
+                            <p className="font-black text-sm text-[#0B1B3D]">{rev.customerName}</p>
+                            <p className="text-[10px] text-[#0B1B3D]/40 font-bold uppercase tracking-wider">
+                              {format(new Date(rev.createdAt), 'MMM yyyy')}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex gap-0.5 text-[#F8991D]">
+                          {[...Array(5)].map((_, i) => (
+                            <Star 
+                              key={i} 
+                              className={cn("h-3 w-3", i < rev.rating ? "fill-[#F8991D]" : "text-[#0B1B3D]/10")} 
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      <p className="text-[#0B1B3D]/80 text-sm font-medium leading-relaxed italic">
+                        &quot;{rev.comment}&quot;
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </section>
             )}
           </div>
-          {detail.images.filter((i) => i.url).length > 1 && (
-            <ul className="grid grid-cols-4 gap-2 sm:grid-cols-5">
-              {detail.images
-                .filter((i) => i.url)
-                .slice(1, 9)
-                .map((im) => (
-                  <li key={im.id} className="relative aspect-square overflow-hidden rounded-lg border border-border">
-                    <Image src={im.url} alt="" fill className="object-cover" sizes="120px" />
-                  </li>
-                ))}
-            </ul>
-          )}
+
+          {/* RIGHT SIDEBAR: Booking Form (Sticky) */}
+          <aside className="w-full lg:w-[380px] shrink-0">
+            <div className="lg:sticky lg:top-28">
+              <BookingSidebar 
+                vehicleId={detail.id}
+                withDriverEnabled={detail.withDriverEnabled}
+                selfDriveEnabled={detail.selfDriveEnabled}
+                user={prefill}
+                loginNextPath={path}
+                accountRole={user ? (user.role as 'CUSTOMER' | 'VENDOR' | 'ADMIN') : null}
+                initialSearch={{
+                  pickupPlaceId: typeof rawSearch.pickupPlaceId === 'string' ? rawSearch.pickupPlaceId : undefined,
+                  dropoffPlaceId: typeof rawSearch.dropoffPlaceId === 'string' ? rawSearch.dropoffPlaceId : undefined,
+                  pickupAddress: typeof rawSearch.pickupAddress === 'string' ? rawSearch.pickupAddress : undefined,
+                  dropoffAddress: typeof rawSearch.dropoffAddress === 'string' ? rawSearch.dropoffAddress : undefined,
+                }}
+              />
+            </div>
+          </aside>
         </div>
+      </main>
 
-        <div className="space-y-6 lg:col-span-2">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground md:text-3xl">{detail.name}</h1>
-            <p className="mt-1 text-muted-foreground">
-              {detail.make} {detail.model} · {detail.year}
-            </p>
-            {detail.cities.length > 0 && (
-              <p className="mt-2 text-sm text-muted-foreground">{detail.cities.join(' · ')}</p>
-            )}
-          </div>
-
-          <Card className="border-border">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Pricing (PKR)</CardTitle>
-              <CardDescription>Per day / month where enabled.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              {detail.withDriverEnabled && (
-                <div className="flex justify-between gap-4 border-b border-border pb-2">
-                  <span className="text-muted-foreground">With driver</span>
-                  <span className="text-right font-medium text-foreground">
-                    {formatPkMoney(detail.priceWithDriverDay)} / day
-                    <span className="text-muted-foreground">
-                      {' '}
-                      · {formatPkMoney(detail.priceWithDriverMonth)} / mo
-                    </span>
-                  </span>
-                </div>
-              )}
-              {detail.selfDriveEnabled && (
-                <div className="flex justify-between gap-4">
-                  <span className="text-muted-foreground">Self drive</span>
-                  <span className="text-right font-medium text-foreground">
-                    {formatPkMoney(detail.priceSelfDriveDay)} / day
-                    <span className="text-muted-foreground">
-                      {' '}
-                      · {formatPkMoney(detail.priceSelfDriveMonth)} / mo
-                    </span>
-                  </span>
-                </div>
-              )}
-              {!detail.withDriverEnabled && !detail.selfDriveEnabled && (
-                <p className="text-muted-foreground">No pricing configured.</p>
-              )}
-            </CardContent>
-          </Card>
-
-          {detail.pickupFormattedAddress && (
-            <p className="text-sm text-muted-foreground">
-              <span className="font-medium text-foreground">Pickup: </span>
-              {detail.pickupFormattedAddress}
-            </p>
-          )}
-
-          <Card className="border-border">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">{detail.vendor.businessName}</CardTitle>
-              <CardDescription>
-                Rated {detail.vendor.avgRating} ({detail.vendor.totalReviews} reviews)
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {detail.vendor.businessLogoUrl && (
-                <div className="relative mb-3 h-12 w-12 overflow-hidden rounded-lg border border-border">
-                  <Image
-                    src={detail.vendor.businessLogoUrl}
-                    alt=""
-                    width={48}
-                    height={48}
-                    className="object-cover"
-                  />
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+      {/* Recommended Section at the bottom */}
+      <div className="mt-10 pt-10 border-t-2 border-[#0B1B3D]/5">
+        <RecommendedSection />
       </div>
-
-      <section className="border-t border-border pt-10">
-        <h2 className="text-lg font-semibold text-foreground">Request a booking</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Use the button below — sign in or create an account in the popup if needed, then enter pickup,
-          drop-off, and times. Distance is calculated when you submit.
-        </p>
-        <div className="mt-6 max-w-2xl">
-          <BookingRequestForm
-            vehicleId={detail.id}
-            withDriverEnabled={detail.withDriverEnabled}
-            selfDriveEnabled={detail.selfDriveEnabled}
-            user={prefill}
-            loginNextPath={path}
-            accountRole={user ? (user.role as 'CUSTOMER' | 'VENDOR' | 'ADMIN') : null}
-          />
-        </div>
-      </section>
     </div>
   )
 }

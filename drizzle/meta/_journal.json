@@ -78,6 +78,13 @@
       "when": 1775462011212,
       "tag": "0010_motionless_catseye",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1775635492618,
+      "tag": "0011_narrow_sunspot",
+      "breakpoints": true
     }
   ]
 }

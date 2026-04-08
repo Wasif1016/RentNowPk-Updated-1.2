@@ -26,7 +26,7 @@ import {
 type LoginState = LoginActionResult | null
 
 async function loginFormAction(_prev: LoginState, formData: FormData): Promise<LoginState> {
-  return loginAction(formData)
+  return loginAction(_prev, formData)
 }
 
 const errorMessages: Record<string, string> = {

@@ -44,6 +44,16 @@ export function dtoToBroadcastPayload(dto: ChatMessageDto) {
       created_at: dto.createdAt,
       delivered_at: dto.deliveredAt,
       seen_at: dto.seenAt,
+      offer: dto.offer ? {
+        id: dto.offer.id,
+        vehicle_id: dto.offer.vehicleId,
+        vehicle_name: dto.offer.vehicleName,
+        price_per_day: dto.offer.pricePerDay,
+        total_price: dto.offer.totalPrice,
+        note: dto.offer.note,
+        status: dto.offer.status,
+        sender_id: dto.offer.senderId,
+      } : null,
     }
   }
 }

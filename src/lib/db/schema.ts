@@ -377,6 +377,8 @@ export const bookingOffers = pgTable(
     vendorId: uuid('vendor_id')
       .notNull()
       .references(() => vendorProfiles.id),
+    senderId: uuid('sender_id')
+      .references(() => users.id),
 
     pricePerDay: decimal('price_per_day', { precision: 10, scale: 2 }).notNull(),
     totalPrice: decimal('total_price', { precision: 10, scale: 2 }).notNull(),
@@ -476,6 +478,7 @@ export const messages = pgTable(
 
     content: text("content"),
     messageType: text("message_type").default("TEXT").notNull(),
+    offerId: uuid("offer_id").references(() => bookingOffers.id),
     mediaUrl: text("media_url"),
     audioDuration: integer("audio_duration"),
 
@@ -801,6 +804,10 @@ export const messagesRelations = relations(messages, ({ one }) => ({
   sender: one(users, {
     fields: [messages.senderId],
     references: [users.id],
+  }),
+  offer: one(bookingOffers, {
+    fields: [messages.offerId],
+    references: [bookingOffers.id],
   }),
 }));
 

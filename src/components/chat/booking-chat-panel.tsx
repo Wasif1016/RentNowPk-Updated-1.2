@@ -9,16 +9,17 @@ import {
   vendorRejectBooking,
 } from '@/lib/actions/booking-vendor-response'
 import { markThreadRead } from '@/lib/actions/chat-read'
-import { deleteChatMessage, editChatMessage, sendChatMessage, sendVoiceMessage } from '@/lib/actions/chat'
-import { createOfferFromChat } from '@/lib/actions/booking-offers'
+import { deleteChatMessage, editChatMessage, sendChatMessage, sendVoiceMessage, sendImageMessage } from '@/lib/actions/chat'
+import { createOfferFromChat, getVendorFleet } from '@/lib/actions/booking-offers'
 import { OfferDialog } from '@/components/chat/offer-dialog'
+import { OfferMessage } from '@/components/chat/offer-message'
 import {
   useBookingChat,
   isOptimisticMessageId,
 } from '@/hooks/use-booking-chat'
 import { useAudioRecorder } from '@/hooks/use-audio-recorder'
 import { VoiceMessage } from '@/components/chat/voice-message'
-import { Mic, Square, X, SendHorizontal, Check, CheckCheck, Paperclip } from 'lucide-react'
+import { Mic, Square, X, SendHorizontal, Check, CheckCheck, Paperclip, Image as ImageIcon, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { bookings } from '@/lib/db/schema'
 import type { ChatMessageDto, MessageCursor } from '@/lib/db/chat'
@@ -129,6 +130,15 @@ export function BookingChatPanel({
     'accept' | 'reject' | null
   >(null)
   const [offerOpen, setOfferOpen] = useState(false)
+  const [internalVehicles, setInternalVehicles] = useState<{id: string, name: string}[]>(vehicles)
+
+  useEffect(() => {
+    if (vehicles.length === 0) {
+      void getVendorFleet(bookingId).then(setInternalVehicles).catch(console.error)
+    } else {
+      setInternalVehicles(vehicles)
+    }
+  }, [bookingId, vehicles])
 
   // --- Edit state ---
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
@@ -140,9 +150,11 @@ export function BookingChatPanel({
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
 
-  // --- Voice state ---
+  // --- Voice & File state ---
   const recorder = useAudioRecorder()
   const [isSendingVoice, setIsSendingVoice] = useState(false)
+  const [isUploadingFile, setIsUploadingFile] = useState(false)
+  const imageInputRef = useRef<HTMLInputElement>(null)
 
   // --- Scrolling ---
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -243,6 +255,64 @@ export function BookingChatPanel({
     } finally {
       setIsSendingVoice(false)
     }
+  }
+
+  const handleFileClick = () => {
+    imageInputRef.current?.click()
+  }
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Limit check
+    if (file.size > 3 * 1024 * 1024) {
+      toast.error('File size must be less than 3MB')
+      return
+    }
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml']
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Only images (JPG, PNG, GIF, WebP, SVG) are allowed.')
+      return
+    }
+
+    setIsUploadingFile(true)
+    const tempId = `temp-img-${Date.now()}`
+
+    const reader = new FileReader()
+    reader.onloadend = async () => {
+      const base64 = reader.result as string
+
+      addOptimisticMessage({
+        id: tempId,
+        threadId,
+        senderId: currentUserId,
+        content: null,
+        messageType: 'IMAGE',
+        mediaUrl: base64,
+        audioDuration: null,
+        createdAt: new Date().toISOString(),
+        editedAt: null,
+        deliveredAt: null,
+        seenAt: null,
+      })
+
+      const res = await sendImageMessage(bookingId, base64)
+      if (res.ok) {
+        replaceOptimisticMessage(tempId, res.message)
+      } else {
+        removeOptimisticMessage(tempId)
+        toast.error(res.error || 'Failed to send image')
+      }
+      setIsUploadingFile(false)
+      if (imageInputRef.current) imageInputRef.current.value = ''
+    }
+    reader.onerror = () => {
+      setIsUploadingFile(false)
+      toast.error('Failed to read file')
+    }
+    reader.readAsDataURL(file)
   }
 
   // Keyboard support for recording
@@ -512,11 +582,25 @@ export function BookingChatPanel({
         ) : (
           <>
             <div className="flex items-end gap-2">
-              {/* File upload (placeholder — voice only for now) */}
-              <label className="cursor-pointer p-2.5 text-muted-foreground hover:text-primary transition-colors rounded-full hover:bg-muted/50">
-                <Paperclip className="h-5 w-5" />
-                <input type="file" className="hidden" disabled />
-              </label>
+              <button
+                type="button"
+                className={cn(
+                  'p-2.5 rounded-full transition-colors hover:bg-muted/50',
+                  isUploadingFile ? 'text-primary animate-spin' : 'text-muted-foreground hover:text-primary'
+                )}
+                onClick={handleFileClick}
+                disabled={isUploadingFile || isSendingVoice}
+                title="Upload image (max 3MB)"
+              >
+                {isUploadingFile ? <Loader2 className="h-5 w-5 animate-spin" /> : <Paperclip className="h-5 w-5" />}
+              </button>
+              <input 
+                type="file" 
+                ref={imageInputRef} 
+                onChange={handleFileChange} 
+                className="hidden" 
+                accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml"
+              />
 
               {/* Voice button */}
               <button
@@ -564,20 +648,20 @@ export function BookingChatPanel({
                 </Button>
               </div>
 
-              {/* Send Offer (vendor only, confirmed bookings) */}
-              {isVendor && bookingStatus === 'CONFIRMED' && (
+              {/* Send Offer (Temporarily Hidden) */}
+              {false && (
                 <Button
                   variant="outline"
                   size="sm"
-                  className="shrink-0 rounded-xl text-xs"
+                  className="shrink-0 rounded-xl text-xs bg-amber-50 dark:bg-amber-950/20 text-amber-600 hover:text-amber-700 hover:bg-amber-100 border-amber-200"
                   onClick={() => setOfferOpen(true)}
                 >
-                  Send Offer
+                  Negotiate
                 </Button>
               )}
             </div>
 
-            <div className="flex justify-between items-center mt-2 text-xs text-muted-foreground/60">
+            {/* <div className="flex justify-between items-center mt-2 text-xs text-muted-foreground/60">
               <span className="flex items-center gap-1">
                 <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -585,7 +669,7 @@ export function BookingChatPanel({
                 End-to-end encrypted
               </span>
               <span>Voice messages supported</span>
-            </div>
+            </div> */}
           </>
         )}
       </footer>
@@ -615,7 +699,7 @@ export function BookingChatPanel({
       <OfferDialog
         open={offerOpen}
         onOpenChange={setOfferOpen}
-        vehicles={vehicles}
+        vehicles={internalVehicles}
         onSubmit={handleOfferSubmit}
       />
     </div>
@@ -656,6 +740,7 @@ function renderMessageList(props: MessageListProps) {
       <MessageBubbleItem
         key={msg.id}
         message={msg}
+        currentUserId={currentUserId}
         isOwn={msg.senderId === currentUserId}
         pending={isOptimisticMessageId(msg.id)}
         editing={editingMessageId === msg.id}
@@ -694,6 +779,7 @@ function DaySeparator({ date }: { date: Date }) {
 
 type BubbleProps = {
   message: ChatMessageDto
+  currentUserId: string
   isOwn: boolean
   pending?: boolean
   editing: boolean
@@ -709,6 +795,7 @@ type BubbleProps = {
 
 function MessageBubbleItem({
   message,
+  currentUserId,
   isOwn,
   pending,
   editing,
@@ -786,6 +873,16 @@ function MessageBubbleItem({
                 duration={message.audioDuration || 0} 
                 isOwn={isOwn} 
               />
+            ) : message.messageType === 'IMAGE' ? (
+              <ImageMessage 
+                url={message.mediaUrl || ''} 
+                isOwn={isOwn} 
+              />
+            ) : message.messageType === 'OFFER' ? (
+              <OfferMessage 
+                message={message}
+                currentUserId={currentUserId}
+              />
             ) : (
               <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
                 {message.content}
@@ -825,6 +922,50 @@ function MessageBubbleItem({
   )
 }
 
+function ImageMessage({ url, isOwn }: { url: string; isOwn: boolean }) {
+  const [isOpen, setIsOpen] = useState(false)
+
+  return (
+    <>
+      <div 
+        className="relative cursor-pointer group/img overflow-hidden rounded-lg bg-black/5 dark:bg-white/5"
+        onClick={() => setIsOpen(true)}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img 
+          src={url} 
+          alt="Shared image" 
+          className="max-w-full max-h-[300px] object-contain rounded-lg transition-transform hover:scale-[1.02]"
+          loading="lazy"
+        />
+        <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/10 transition-colors" />
+      </div>
+
+      {/* Lightbox / Full view */}
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 overflow-hidden bg-transparent border-none shadow-none flex items-center justify-center">
+          <div className="relative w-full h-full flex items-center justify-center p-4">
+             {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img 
+              src={url} 
+              alt="Shared image full view" 
+              className="max-w-full max-h-[90vh] object-contain rounded-md"
+            />
+            <Button 
+              size="icon" 
+              variant="secondary" 
+              className="absolute top-2 right-2 rounded-full h-8 w-8 opacity-70 hover:opacity-100"
+              onClick={() => setIsOpen(false)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+
 function MessageOwnActions({
   message,
   onEdit,
@@ -848,7 +989,10 @@ function MessageOwnActions({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onSelect={onEdit} disabled={isOptimisticMessageId(message.id)}>
+        <DropdownMenuItem 
+          onSelect={onEdit} 
+          disabled={isOptimisticMessageId(message.id) || message.messageType !== 'TEXT'}
+        >
           Edit
         </DropdownMenuItem>
         <DropdownMenuItem
