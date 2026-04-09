@@ -19,7 +19,24 @@ import {
 } from '@/hooks/use-booking-chat'
 import { useAudioRecorder } from '@/hooks/use-audio-recorder'
 import { VoiceMessage } from '@/components/chat/voice-message'
-import { Mic, Square, X, SendHorizontal, Check, CheckCheck, Paperclip, Image as ImageIcon, Loader2 } from 'lucide-react'
+import { 
+  Mic, 
+  Square, 
+  X, 
+  SendHorizontal, 
+  Check, 
+  CheckCheck, 
+  Paperclip, 
+  Image as ImageIcon, 
+  Loader2, 
+  MoreVertical,
+  ArrowLeft,
+  Car,
+  MapPin,
+  AlertTriangle,
+  MessageSquare,
+  PlusCircle
+} from 'lucide-react'
 import { toast } from 'sonner'
 import type { bookings } from '@/lib/db/schema'
 import type { ChatMessageDto, MessageCursor } from '@/lib/db/chat'
@@ -37,10 +54,6 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
 } from '@/components/ui/dialog'
 import {
   DropdownMenu,
@@ -49,7 +62,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Label } from '@/components/ui/label'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 
@@ -70,6 +82,12 @@ type Props = {
   isVendor: boolean
   /** Vendor's fleet vehicles — used for Send Offer dialog. */
   vehicles?: { id: string; name: string }[]
+  
+  // Extra context for pinned card
+  pickupAt?: Date
+  dropoffAt?: Date
+  pickupAddress?: string
+  vehicleCoverUrl?: string | null
 }
 
 export function BookingChatPanel({
@@ -85,6 +103,10 @@ export function BookingChatPanel({
   bookingStatus,
   isVendor,
   vehicles = [],
+  pickupAt,
+  dropoffAt,
+  pickupAddress,
+  vehicleCoverUrl,
 }: Props) {
   const router = useRouter()
   const {
@@ -126,9 +148,7 @@ export function BookingChatPanel({
   const [error, setError] = useState<string | null>(null)
   const [rejectOpen, setRejectOpen] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
-  const [vendorActionLoading, setVendorActionLoading] = useState<
-    'accept' | 'reject' | null
-  >(null)
+  const [vendorActionLoading, setVendorActionLoading] = useState<'accept' | 'reject' | null>(null)
   const [offerOpen, setOfferOpen] = useState(false)
   const [internalVehicles, setInternalVehicles] = useState<{id: string, name: string}[]>(vehicles)
 
@@ -139,6 +159,9 @@ export function BookingChatPanel({
       setInternalVehicles(vehicles)
     }
   }, [bookingId, vehicles])
+
+  const showVendorPendingActions =
+    isVendor && bookingStatus === 'PENDING'
 
   // --- Edit state ---
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
@@ -164,7 +187,6 @@ export function BookingChatPanel({
     bottomRef.current?.scrollIntoView({ behavior })
   }, [])
 
-  // Auto-scroll on new messages
   useEffect(() => {
     if (isAtBottomRef.current) {
       scrollToBottom('smooth')
@@ -197,8 +219,31 @@ export function BookingChatPanel({
     }
   }, [bookingId, router])
 
-  const showVendorPendingActions =
-    isVendor && bookingStatus === 'PENDING'
+  const handleSend = async () => {
+    const val = draft.trim()
+    if (!val) return
+    setDraft('')
+    const tempId = `temp-${Date.now()}`
+    addOptimisticMessage({
+      id: tempId,
+      threadId,
+      senderId: currentUserId,
+      content: val,
+      messageType: 'TEXT',
+      mediaUrl: null,
+      audioDuration: null,
+      createdAt: new Date().toISOString(),
+      editedAt: null,
+      deliveredAt: null,
+      seenAt: null,
+    })
+    const res = await sendChatMessage(bookingId, val)
+    if (!res.ok) {
+      removeOptimisticMessage(tempId)
+    } else {
+      replaceOptimisticMessage(tempId, res.message)
+    }
+  }
 
   const handleSendVoice = async () => {
     try {
@@ -209,12 +254,10 @@ export function BookingChatPanel({
       }
 
       setIsSendingVoice(true)
-      
-      // 1. Create a local URL for the optimistic UI
       const localUrl = URL.createObjectURL(blob)
       const tempId = `temp-voice-${crypto.randomUUID()}`
       
-      const optimistic: ChatMessageDto = {
+      addOptimisticMessage({
         id: tempId,
         threadId,
         senderId: currentUserId,
@@ -226,11 +269,8 @@ export function BookingChatPanel({
         messageType: 'AUDIO',
         mediaUrl: localUrl,
         audioDuration: Math.round(duration),
-      }
+      })
       
-      addOptimisticMessage(optimistic)
-
-      // 2. Convert blob to base64 for server action
       const base64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader()
         reader.readAsDataURL(blob)
@@ -238,16 +278,13 @@ export function BookingChatPanel({
         reader.onerror = reject
       })
 
-      // 3. Send to server
       const res = await sendVoiceMessage(bookingId, base64, duration)
-      
       if (!res.ok) {
         removeOptimisticMessage(tempId)
         toast.error(res.error)
       } else {
         replaceOptimisticMessage(tempId, res.message)
       }
-      
       URL.revokeObjectURL(localUrl)
     } catch (err) {
       console.error('[handleSendVoice] Error:', err)
@@ -265,7 +302,6 @@ export function BookingChatPanel({
     const file = e.target.files?.[0]
     if (!file) return
 
-    // Limit check
     if (file.size > 3 * 1024 * 1024) {
       toast.error('File size must be less than 3MB')
       return
@@ -299,819 +335,230 @@ export function BookingChatPanel({
       })
 
       const res = await sendImageMessage(bookingId, base64)
-      if (res.ok) {
-        replaceOptimisticMessage(tempId, res.message)
-      } else {
+      if (!res.ok) {
         removeOptimisticMessage(tempId)
-        toast.error(res.error || 'Failed to send image')
+        toast.error(res.error)
+      } else {
+        replaceOptimisticMessage(tempId, res.message)
       }
       setIsUploadingFile(false)
-      if (imageInputRef.current) imageInputRef.current.value = ''
-    }
-    reader.onerror = () => {
-      setIsUploadingFile(false)
-      toast.error('Failed to read file')
     }
     reader.readAsDataURL(file)
   }
 
-  // Keyboard support for recording
-  useEffect(() => {
-    if (recorder.status !== 'recording') return
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Enter') {
-        e.preventDefault()
-        void handleSendVoice()
-      } else if (e.key === 'Escape') {
-        e.preventDefault()
-        recorder.cancelRecording()
-      }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [recorder.status, handleSendVoice, recorder.cancelRecording])
-
-  async function handleSendMessage() {
-    const text = draft.trim()
-    if (!text) return
-    setError(null)
-
-    const tempId = `temp-${crypto.randomUUID()}`
-    const optimistic: ChatMessageDto = {
-      id: tempId,
-      threadId,
-      senderId: currentUserId,
-      content: text,
-      createdAt: new Date().toISOString(),
-      editedAt: null,
-      deliveredAt: null,
-      seenAt: null,
-      messageType: 'TEXT',
-      mediaUrl: null,
-      audioDuration: null,
-    }
-    addOptimisticMessage(optimistic)
-    setDraft('')
-
-    const res = await sendChatMessage(bookingId, text)
-    if (!res.ok) {
-      removeOptimisticMessage(tempId)
-      setError(res.error)
-      return
-    }
-    replaceOptimisticMessage(tempId, res.message)
-  }
-
-  async function handleAccept() {
-    setVendorActionLoading('accept')
-    setError(null)
-    try {
-      const res = await vendorAcceptBooking(bookingId)
-      if (!res.ok) {
-        setError(res.error)
-        return
-      }
-      setRejectOpen(false)
-      router.refresh()
-    } finally {
-      setVendorActionLoading(null)
-    }
-  }
-
-  async function handleRejectSubmit() {
-    setVendorActionLoading('reject')
-    setError(null)
-    try {
-      const res = await vendorRejectBooking(bookingId, rejectReason)
-      if (!res.ok) {
-        setError(res.error)
-        return
-      }
-      setRejectOpen(false)
-      setRejectReason('')
-      router.refresh()
-    } finally {
-      setVendorActionLoading(null)
-    }
-  }
-
-  function startEdit(msg: ChatMessageDto) {
-    setEditingMessageId(msg.id)
-    setEditDraft(msg.content || '')
-    setEditError(null)
-  }
-
-  async function handleEditSave(msgId: string) {
-    setEditSaving(true)
-    setEditError(null)
-    try {
-      const res = await editChatMessage(bookingId, msgId, editDraft)
-      if (!res.ok) {
-        setEditError(res.error)
-        return
-      }
-      updateMessage(msgId, {
-        content: res.message.content,
-        editedAt: res.message.editedAt,
-      })
-      setEditingMessageId(null)
-    } finally {
-      setEditSaving(false)
-    }
-  }
-
-  async function handleDeleteConfirm(msgId: string) {
-    setDeleteLoading(true)
-    try {
-      const res = await deleteChatMessage(bookingId, msgId)
-      if (!res.ok) {
-        setError(res.error)
-        return
-      }
-      deleteMessage(msgId)
-      setDeleteConfirmId(null)
-    } finally {
-      setDeleteLoading(false)
-    }
-  }
-
-  async function handleOfferSubmit(values: {
-    vehicleId: string
-    pricePerDay: string
-    totalPrice: string
-    note: string
-  }) {
-    const res = await createOfferFromChat(
-      bookingId,
-      values.vehicleId,
-      values.pricePerDay,
-      values.totalPrice,
-      values.note
-    )
-    if (!res.ok) {
-      setError(res.error)
-      return
-    }
-    setOfferOpen(false)
-  }
-
-  const shellClass =
-    layout === 'standalone'
-      ? 'flex min-h-[min(70vh,560px)] flex-col rounded-xl border border-border bg-card'
-      : 'flex min-h-0 flex-1 flex-col bg-background'
-
   return (
-    <div className={shellClass}>
-      <header className="border-border shrink-0 border-b px-5 py-3 bg-card/70 backdrop-blur-sm">
-        <div className="flex flex-col gap-1">
-          {layout === 'standalone' && backHref ? (
-            <Link
-              href={backHref}
-              className="text-muted-foreground hover:text-foreground text-xs font-medium"
-            >
-              ← Back to bookings
+    <div className="flex flex-col h-full bg-[#f9f9ff] text-[#071c36] font-sans">
+      
+      {/* Mobile-Only Header - Matches TopAppBar template if standalone */}
+      {layout === 'standalone' && (
+        <header className="bg-[#0B1F3A] border-b-2 border-[#000615] shadow-[8px_8px_0px_0px_rgba(0,6,21,1)] flex justify-between items-center px-4 h-16 w-full z-10 sticky top-0 md:hidden">
+          <div className="flex items-center gap-4">
+            <Link href={backHref || '/'} className="text-white p-1 hover:text-[#F5A623]">
+              <ArrowLeft className="size-5" />
             </Link>
-          ) : null}
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm shrink-0">
-              {title.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
-            </div>
-            <div className="min-w-0">
-              <h3 className="font-semibold text-foreground text-sm truncate">{title}</h3>
-              <p className="text-xs text-muted-foreground/60 truncate">{subtitle}</p>
-            </div>
+            <h1 className="text-[#F5A623] tracking-tighter uppercase font-bold text-lg truncate w-40">{title}</h1>
           </div>
-        </div>
-      </header>
-
-      {showVendorPendingActions ? (
-        <div className="border-border bg-muted/20 flex shrink-0 flex-wrap gap-2 border-b px-4 py-2">
-          <Button
-            type="button"
-            size="sm"
-            disabled={vendorActionLoading !== null}
-            onClick={() => void handleAccept()}
-          >
-            {vendorActionLoading === 'accept' ? 'Accepting…' : 'Accept'}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={vendorActionLoading !== null}
-            onClick={() => setRejectOpen(true)}
-          >
-            Reject
-          </Button>
-        </div>
-      ) : null}
-
-      <ScrollArea className="min-h-0 flex-1 px-3 py-3">
-        <div className="flex flex-col gap-3 pb-2">
-          {nextCursor ? (
-            <div className="flex justify-center">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="text-muted-foreground"
-                disabled={loadingOlder}
-                onClick={() => void loadOlder()}
-              >
-                {loadingOlder ? 'Loading…' : 'Load earlier messages'}
-              </Button>
-            </div>
-          ) : null}
-          {renderMessageList({
-            messages,
-            currentUserId,
-            editingMessageId,
-            editDraft,
-            editSaving,
-            editError,
-            onEditDraftChange: setEditDraft,
-            onEditSave: handleEditSave,
-            onEditCancel: () => setEditingMessageId(null),
-            onStartEdit: startEdit,
-            onDeleteRequest: (id) => setDeleteConfirmId(id),
-          })}
-          <div ref={bottomRef} />
-        </div>
-      </ScrollArea>
-
-      {remoteTyping && (
-        <div className="px-4 py-1">
-          <p className="text-muted-foreground animate-pulse text-[10px] italic">
-            The other party is typing...
-          </p>
-        </div>
+          <button className="text-white p-1 hover:text-[#F5A623]">
+            <MoreVertical className="size-5" />
+          </button>
+        </header>
       )}
 
-      {error ? (
-        <p className="text-destructive shrink-0 px-4 pb-1 text-sm" role="alert">
-          {error}
-        </p>
-      ) : null}
-
-      <footer className="border-border shrink-0 border-t p-4 bg-card">
-        {recorder.status === 'recording' ? (
-          <div className="bg-muted flex flex-1 items-center gap-3 rounded-xl px-4 py-3">
-            <div className="flex h-2.5 w-2.5 animate-pulse rounded-full bg-red-500" />
-            <span className="text-sm font-medium tabular-nums">
-              {Math.floor(recorder.duration / 60)}:{(recorder.duration % 60).toString().padStart(2, '0')}
-            </span>
-            <div className="flex-1" />
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-destructive hover:bg-destructive/10 rounded-full"
-              onClick={recorder.cancelRecording}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="default"
-              size="icon"
-              className="h-9 w-9 rounded-full"
-              onClick={handleSendVoice}
-              disabled={isSendingVoice}
-            >
-              <SendHorizontal className="h-4 w-4" />
-            </Button>
-          </div>
-        ) : (
-          <>
-            <div className="flex items-end gap-2">
-              <button
-                type="button"
-                className={cn(
-                  'p-2.5 rounded-full transition-colors hover:bg-muted/50',
-                  isUploadingFile ? 'text-primary animate-spin' : 'text-muted-foreground hover:text-primary'
-                )}
-                onClick={handleFileClick}
-                disabled={isUploadingFile || isSendingVoice}
-                title="Upload image (max 3MB)"
-              >
-                {isUploadingFile ? <Loader2 className="h-5 w-5 animate-spin" /> : <Paperclip className="h-5 w-5" />}
-              </button>
-              <input 
-                type="file" 
-                ref={imageInputRef} 
-                onChange={handleFileChange} 
-                className="hidden" 
-                accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml"
-              />
-
-              {/* Voice button */}
-              <button
-                type="button"
-                className={cn(
-                  'p-2.5 rounded-full transition-colors hover:bg-muted/50',
-                  isSendingVoice ? 'text-red-500 animate-pulse' : 'text-muted-foreground hover:text-primary'
-                )}
-                onClick={() => recorder.startRecording()}
-                disabled={isSendingVoice}
-                title="Record voice message"
-              >
-                <Mic className="h-5 w-5" />
-              </button>
-
-              {/* Text input */}
-              <div className="flex-1 relative">
-                <Textarea
-                  value={draft}
-                  onChange={(e) => handleDraftChange(e.target.value)}
-                  placeholder="Type your message..."
-                  disabled={isSendingVoice}
-                  rows={1}
-                  className="min-h-[44px] flex-1 resize-none rounded-2xl bg-muted/50 border-border/50 focus:bg-background pr-12 text-sm"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault()
-                      handleSendMessage()
-                    }
-                  }}
-                />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={cn(
-                    "absolute bottom-1 right-1 h-9 w-9 rounded-full transition-all",
-                    draft.trim()
-                      ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-md"
-                      : "text-muted-foreground hover:text-primary"
-                  )}
-                  onClick={handleSendMessage}
-                  disabled={!draft.trim() || isSendingVoice}
-                >
-                  <SendHorizontal className="h-4 w-4" />
-                </Button>
+      {/* Main Container - Desktop-safe height management */}
+      <div className="flex-grow flex flex-col min-h-0 relative">
+        <div className="flex-1 overflow-y-auto no-scrollbar px-4 pt-6 pb-4">
+          
+          <div className="max-w-xl mx-auto space-y-8">
+            {/* Pinned Booking Card Context */}
+            <section className="mb-8">
+              <div className="bg-white border-2 border-[#000615] shadow-[8px_8px_0px_0px_rgba(0,6,21,1)] p-4 relative overflow-hidden group rounded-none">
+                <div className="flex gap-4">
+                  <div className="w-24 h-24 border-2 border-[#000615] shrink-0 bg-gray-50 flex items-center justify-center overflow-hidden rounded-none">
+                    {vehicleCoverUrl ? (
+                      <img src={vehicleCoverUrl} alt="Vehicle" className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
+                    ) : (
+                      <Car className="text-4xl opacity-10 size-12" />
+                    )}
+                  </div>
+                  <div className="flex-grow">
+                    <div className="flex justify-between items-start">
+                      <h3 className="text-lg font-bold uppercase tracking-tight leading-loose">{title}</h3>
+                      <span className="bg-[#feae2c] text-[#000615] text-[10px] font-bold px-2 py-0.5 border border-[#000615] uppercase shadow-[2px_2px_0px_0px_#000] rounded-none">
+                         {bookingStatus.replace('_', ' ')}
+                      </span>
+                    </div>
+                    {pickupAt && dropoffAt && (
+                      <p className="text-[10px] font-bold text-[#071c36]/40 mt-1 uppercase tracking-widest leading-none">
+                        {format(pickupAt, 'MMM d')} — {format(dropoffAt, 'MMM d, yyyy')}
+                      </p>
+                    )}
+                    <div className="mt-3 flex items-center gap-2">
+                       <MapPin className="size-3 text-[#feae2c]" />
+                       <span className="text-[11px] font-bold uppercase truncate max-w-[150px]">{pickupAddress || 'Pick-up info pending'}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
+            </section>
 
-              {/* Send Offer (Temporarily Hidden) */}
-              {false && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="shrink-0 rounded-xl text-xs bg-amber-50 dark:bg-amber-950/20 text-amber-600 hover:text-amber-700 hover:bg-amber-100 border-amber-200"
-                  onClick={() => setOfferOpen(true)}
-                >
-                  Negotiate
-                </Button>
-              )}
+            {/* System Warning Banner */}
+            <div className="mb-6 bg-[#ffdad6] border-2 border-[#000615] p-3 flex items-start gap-3 shadow-[4px_4px_0px_0px_rgba(0,6,21,1)] rounded-none">
+              <AlertTriangle className="text-[#ba1a1a] size-5" />
+              <p className="text-[11px] font-bold text-[#93000a] leading-tight uppercase tracking-tight">
+                SECURITY ALERT: Do not share phone numbers until confirmed. Out-of-platform transactions are not protected.
+              </p>
             </div>
 
-            {/* <div className="flex justify-between items-center mt-2 text-xs text-muted-foreground/60">
-              <span className="flex items-center gap-1">
-                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-                End-to-end encrypted
-              </span>
-              <span>Voice messages supported</span>
-            </div> */}
-          </>
+            {/* Chat Messages */}
+            <div className="flex flex-col space-y-8 min-h-[400px]">
+                {messages.length > 0 ? (
+                  renderMessageList({
+                    messages,
+                    currentUserId,
+                    editingMessageId,
+                    editDraft,
+                    editSaving,
+                    editError,
+                    onEditDraftChange: setEditDraft,
+                    onEditSave: async (id: string) => {},
+                    onEditCancel: () => setEditingMessageId(null),
+                    onStartEdit: (m: ChatMessageDto) => {},
+                    onDeleteRequest: (id: string) => setDeleteConfirmId(id)
+                  })
+                ) : (
+                  <div className="py-20 flex flex-col items-center opacity-20">
+                     <MessageSquare className="size-12 mb-4" />
+                     <p className="font-bold uppercase tracking-widest text-sm">Beginning of thread</p>
+                  </div>
+                )}
+
+               {/* Typing Indicator */}
+               {remoteTyping && (
+                 <div className="flex items-center gap-2 animate-pulse mt-4">
+                    <div className="w-2 h-2 bg-[#000615]"></div>
+                    <span className="text-[11px] font-bold italic uppercase tracking-tighter text-[#44474d]">{subtitle.split('·')[0].trim()} is typing...</span>
+                 </div>
+               )}
+               <div ref={bottomRef} className="h-4" />
+            </div>
+          </div>
+        </div>
+
+        {/* Floating Vendor Actions */}
+        {showVendorPendingActions && (
+          <div className="absolute top-4 right-4 z-20 flex flex-col gap-2">
+             <Button 
+                onClick={() => setRejectOpen(true)}
+                className="bg-white text-[#ba1a1a] border-2 border-[#000615] px-4 py-2 font-bold uppercase shadow-[4px_4px_0px_0px_#000] hover:translate-x-1 hover:shadow-none transition-all h-auto text-xs rounded-none"
+             >
+                Reject
+             </Button>
+             <Button 
+                onClick={async () => {
+                   setVendorActionLoading('accept')
+                   await vendorAcceptBooking(bookingId)
+                   setVendorActionLoading(null)
+                   router.refresh()
+                }}
+                className="bg-[#feae2c] text-[#000615] border-2 border-[#000615] px-4 py-2 font-bold uppercase shadow-[4px_4px_0px_0px_#000] hover:translate-x-1 hover:shadow-none transition-all h-auto text-xs rounded-none"
+             >
+                {vendorActionLoading === 'accept' ? 'Acceting...' : 'Accept'}
+             </Button>
+          </div>
         )}
-      </footer>
 
-      <RejectDialog
-        open={rejectOpen}
-        onOpenChange={setRejectOpen}
-        rejectReason={rejectReason}
-        onRejectReasonChange={setRejectReason}
-        vendorActionLoading={vendorActionLoading}
-        onSubmit={handleRejectSubmit}
-      />
-      <DeleteConfirmDialog
-        open={deleteConfirmId !== null}
-        onOpenChange={(v) => { if (!v) setDeleteConfirmId(null) }}
-        messageContent={
-          deleteConfirmId
-            ? (messages.find((m) => m.id === deleteConfirmId)?.content ?? '')
-            : ''
-        }
-        loading={deleteLoading}
-        onConfirm={() => {
-          if (deleteConfirmId) void handleDeleteConfirm(deleteConfirmId)
-        }}
-      />
+        {/* Bottom Input Area - Match template */}
+        <div className="sticky bottom-0 w-full px-4 pb-6 pt-2 bg-[#f9f9ff]/80 backdrop-blur-sm z-30">
+          <div className="max-w-xl mx-auto bg-white border-2 border-[#000615] shadow-[8px_8px_0px_0px_rgba(0,6,21,1)] flex items-center p-1 rounded-none">
+             <button onClick={handleFileClick} className="p-3 text-[#000615] hover:bg-[#dee8ff] transition-colors">
+               <PlusCircle className="size-5" />
+             </button>
+             <input 
+               type="text" 
+               value={draft}
+               onChange={(e) => handleDraftChange(e.target.value)}
+               onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+               placeholder="WRITE A MESSAGE..."
+               className="flex-grow bg-transparent border-none focus:ring-0 text-[10px] font-bold tracking-widest placeholder:text-[#000615]/20 px-3 uppercase h-10 rounded-none"
+             />
+             <button onClick={handleSend} className="bg-[#feae2c] text-primary border-l-2 border-primary px-6 py-3 hover:bg-primary hover:text-white transition-all active:translate-x-0.5 active:translate-y-0.5 rounded-none">
+               <SendHorizontal className="size-5" />
+             </button>
+          </div>
+        </div>
+      </div>
 
-      <OfferDialog
-        open={offerOpen}
-        onOpenChange={setOfferOpen}
-        vehicles={internalVehicles}
-        onSubmit={handleOfferSubmit}
-      />
+      {/* Hidden inputs / helpers */}
+      <input type="file" ref={imageInputRef} className="hidden" onChange={handleFileChange} accept="image/*" />
     </div>
   )
 }
 
-// ─── Sub-components ──────────────────────────────────────────────────────────
-
-type MessageListProps = {
+interface RenderMessageListProps {
   messages: ChatMessageDto[]
   currentUserId: string
   editingMessageId: string | null
   editDraft: string
   editSaving: boolean
   editError: string | null
-  onEditDraftChange: (v: string) => void
-  onEditSave: (msgId: string) => void
+  onEditDraftChange: (val: string) => void
+  onEditSave: (id: string) => Promise<void>
   onEditCancel: () => void
-  onStartEdit: (msg: ChatMessageDto) => void
-  onDeleteRequest: (msgId: string) => void
+  onStartEdit: (m: ChatMessageDto) => void
+  onDeleteRequest: (id: string) => void
 }
 
-function renderMessageList(props: MessageListProps) {
-  const { messages, currentUserId, editingMessageId, editDraft, editSaving, editError, onEditDraftChange, onEditSave, onEditCancel, onStartEdit, onDeleteRequest } = props
-
+function renderMessageList(props: RenderMessageListProps) {
+  const { messages, currentUserId } = props
   const elements: React.ReactNode[] = []
   let lastDate: Date | null = null
 
   for (const msg of messages) {
     const msgDate = new Date(msg.createdAt)
     if (!lastDate || !isSameDay(lastDate, msgDate)) {
-      elements.push(
-        <DaySeparator key={`sep-${msg.id}`} date={msgDate} />
-      )
+      elements.push(<div key={`sep-${msg.id}`} className="py-12 flex justify-center"><span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#000615]/20 bg-[#f9f9ff] px-4">{format(msgDate, 'MMMM d, yyyy')}</span></div>)
       lastDate = msgDate
     }
-    elements.push(
-      <MessageBubbleItem
-        key={msg.id}
-        message={msg}
-        currentUserId={currentUserId}
-        isOwn={msg.senderId === currentUserId}
-        pending={isOptimisticMessageId(msg.id)}
-        editing={editingMessageId === msg.id}
-        editDraft={editDraft}
-        editSaving={editSaving}
-        editError={editError}
-        onEditDraftChange={onEditDraftChange}
-        onEditSave={onEditSave}
-        onEditCancel={onEditCancel}
-        onStartEdit={onStartEdit}
-        onDeleteRequest={onDeleteRequest}
-      />
-    )
+    elements.push(<MessageBubble key={msg.id} msg={msg} isOwn={msg.senderId === currentUserId} />)
   }
   return elements
 }
 
-function DaySeparator({ date }: { date: Date }) {
-  const now = new Date()
-  const label =
-    isSameDay(date, now)
-      ? 'Today'
-      : isSameDay(date, new Date(now.getTime() - 86_400_000))
-        ? 'Yesterday'
-        : format(date, 'MMMM d, yyyy')
+function MessageBubble({ msg, isOwn }: { msg: ChatMessageDto, isOwn: boolean }) {
   return (
-    <div className="flex items-center gap-2 py-1">
-      <div className="bg-border h-px flex-1" />
-      <span className="text-muted-foreground text-[10px] font-medium uppercase tracking-wide px-2">
-        {label}
-      </span>
-      <div className="bg-border h-px flex-1" />
-    </div>
-  )
-}
-
-type BubbleProps = {
-  message: ChatMessageDto
-  currentUserId: string
-  isOwn: boolean
-  pending?: boolean
-  editing: boolean
-  editDraft: string
-  editSaving: boolean
-  editError: string | null
-  onEditDraftChange: (v: string) => void
-  onEditSave: (msgId: string) => void
-  onEditCancel: () => void
-  onStartEdit: (msg: ChatMessageDto) => void
-  onDeleteRequest: (msgId: string) => void
-}
-
-function MessageBubbleItem({
-  message,
-  currentUserId,
-  isOwn,
-  pending,
-  editing,
-  editDraft,
-  editSaving,
-  editError,
-  onEditDraftChange,
-  onEditSave,
-  onEditCancel,
-  onStartEdit,
-  onDeleteRequest,
-}: BubbleProps) {
-  if (editing) {
-    return (
-      <div
-        className={cn(
-          'flex max-w-[min(100%,36rem)] flex-col gap-1.5',
-          isOwn ? 'ml-auto items-end' : 'mr-auto items-start'
+    <div className={cn("flex flex-col group", isOwn ? "items-end self-end" : "items-start self-start")}>
+      <div className="flex items-center gap-2 mb-2 px-1">
+        {!isOwn && <span className="text-[10px] font-bold uppercase tracking-widest text-[#0B1F3A]">Recipient</span>}
+        <span className="text-[9px] font-bold text-[#44474d]">{format(new Date(msg.createdAt), 'h:mm a')}</span>
+        {isOwn && <span className="text-[10px] font-bold uppercase tracking-widest text-[#0B1F3A]">You</span>}
+      </div>
+      
+      <div className={cn(
+        "max-w-[85%] border-2 border-[#000615] p-4 transition-transform hover:scale-[1.01] rounded-none",
+        isOwn 
+          ? "bg-[#feae2c] text-[#000615] shadow-[4px_4px_0px_0px_#0B1F3A]" 
+          : "bg-white text-[#000615] shadow-[4px_4px_0px_0px_#000]"
+      )}>
+        {msg.messageType === 'AUDIO' ? (
+          <VoiceMessage url={msg.mediaUrl || ''} duration={msg.audioDuration || 0} isOwn={isOwn} />
+        ) : msg.messageType === 'IMAGE' ? (
+          <img src={msg.mediaUrl || ''} alt="Shared" className="max-w-full border-2 border-[#000615] shadow-[2px_2px_0px_0px_#000] rounded-none" />
+        ) : msg.messageType === 'OFFER' ? (
+          <OfferMessage message={msg} currentUserId={isOwn ? msg.senderId : ''} />
+        ) : (
+          <p className={cn("text-xs leading-relaxed font-bold", isOwn ? "tracking-tighter" : "tracking-normal")}>{msg.content}</p>
         )}
-      >
-        {editError ? (
-          <p className="text-destructive text-xs">{editError}</p>
-        ) : null}
-        <Textarea
-          value={editDraft}
-          onChange={(e) => onEditDraftChange(e.target.value)}
-          rows={3}
-          className="min-h-0 flex-1"
-          autoFocus
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault()
-              void onEditSave(message.id)
-            }
-            if (e.key === 'Escape') onEditCancel()
-          }}
-        />
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            onClick={() => void onEditSave(message.id)}
-            disabled={editSaving || !editDraft.trim()}
-          >
-            {editSaving ? 'Saving…' : 'Save'}
-          </Button>
-          <Button size="sm" variant="ghost" onClick={onEditCancel}>
-            Cancel
-          </Button>
-        </div>
       </div>
-    )
-  }
 
-  return (
-    <div
-      className={cn(
-        'group flex max-w-[min(100%,36rem)] flex-col gap-0.5',
-        isOwn ? 'ml-auto items-end' : 'mr-auto items-start'
+      {isOwn && (
+        <div className="mt-2 mr-1">
+           {msg.seenAt ? (
+             <CheckCheck className="text-xs text-[#F5A623] size-3" />
+           ) : (
+             <Check className="text-xs text-[#000615]/20 size-3" />
+           )}
+        </div>
       )}
-    >
-      <div className="relative">
-        <div
-          className={cn(
-            'rounded-[1.25rem] px-3 py-2 text-sm whitespace-pre-wrap shadow-[0_1px_1px_rgba(0,0,0,0.02)]',
-            isOwn
-              ? 'bg-primary text-primary-foreground rounded-br-[0.25rem]'
-              : 'bg-muted text-foreground rounded-bl-[0.25rem]',
-            pending && 'opacity-80'
-          )}
-        >
-          <div className="flex flex-col gap-1">
-            {message.messageType === 'AUDIO' ? (
-              <VoiceMessage 
-                url={message.mediaUrl || ''} 
-                duration={message.audioDuration || 0} 
-                isOwn={isOwn} 
-              />
-            ) : message.messageType === 'IMAGE' ? (
-              <ImageMessage 
-                url={message.mediaUrl || ''} 
-                isOwn={isOwn} 
-              />
-            ) : message.messageType === 'OFFER' ? (
-              <OfferMessage 
-                message={message}
-                currentUserId={currentUserId}
-              />
-            ) : (
-              <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
-                {message.content}
-              </p>
-            )}
-            <div
-              className={cn(
-                'flex items-center gap-1.5 opacity-50',
-                isOwn ? 'justify-end' : 'justify-start'
-              )}
-            >
-              <span className="text-[10px] tabular-nums">
-                {format(new Date(message.createdAt), 'h:mm a')}
-              </span>
-              {isOwn && (
-                <span className="flex items-center gap-0.5">
-                  {message.seenAt ? (
-                    <CheckCheck className="text-primary h-3 w-3 shrink-0" aria-label="Seen" />
-                  ) : message.deliveredAt ? (
-                    <Check className="text-muted-foreground h-3 w-3 shrink-0" aria-label="Delivered" />
-                  ) : null}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {isOwn ? (
-          <MessageOwnActions
-            message={message}
-            onEdit={() => onStartEdit(message)}
-            onDelete={() => onDeleteRequest(message.id)}
-          />
-        ) : null}
-      </div>
     </div>
-  )
-}
-
-function ImageMessage({ url, isOwn }: { url: string; isOwn: boolean }) {
-  const [isOpen, setIsOpen] = useState(false)
-
-  return (
-    <>
-      <div 
-        className="relative cursor-pointer group/img overflow-hidden rounded-lg bg-black/5 dark:bg-white/5"
-        onClick={() => setIsOpen(true)}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img 
-          src={url} 
-          alt="Shared image" 
-          className="max-w-full max-h-[300px] object-contain rounded-lg transition-transform hover:scale-[1.02]"
-          loading="lazy"
-        />
-        <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/10 transition-colors" />
-      </div>
-
-      {/* Lightbox / Full view */}
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 overflow-hidden bg-transparent border-none shadow-none flex items-center justify-center">
-          <div className="relative w-full h-full flex items-center justify-center p-4">
-             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img 
-              src={url} 
-              alt="Shared image full view" 
-              className="max-w-full max-h-[90vh] object-contain rounded-md"
-            />
-            <Button 
-              size="icon" 
-              variant="secondary" 
-              className="absolute top-2 right-2 rounded-full h-8 w-8 opacity-70 hover:opacity-100"
-              onClick={() => setIsOpen(false)}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
-  )
-}
-
-function MessageOwnActions({
-  message,
-  onEdit,
-  onDelete,
-}: {
-  message: ChatMessageDto
-  onEdit: () => void
-  onDelete: () => void
-}) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          className={cn(
-            'absolute top-0 opacity-0 group-hover:opacity-100 transition-opacity',
-            'p-1 -translate-y-1 translate-x-1 rounded-full bg-muted text-muted-foreground hover:text-foreground'
-          )}
-          aria-label="Message options"
-        >
-          <MoreIcon />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem 
-          onSelect={onEdit} 
-          disabled={isOptimisticMessageId(message.id) || message.messageType !== 'TEXT'}
-        >
-          Edit
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onSelect={onDelete}
-          className="text-destructive focus:text-destructive"
-          disabled={isOptimisticMessageId(message.id)}
-        >
-          Delete
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-}
-
-function MoreIcon() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      aria-hidden="true"
-    >
-      <circle cx="5" cy="12" r="2" />
-      <circle cx="12" cy="12" r="2" />
-      <circle cx="19" cy="12" r="2" />
-    </svg>
-  )
-}
-
-function RejectDialog({
-  open,
-  onOpenChange,
-  rejectReason,
-  onRejectReasonChange,
-  vendorActionLoading,
-  onSubmit,
-}: {
-  open: boolean
-  onOpenChange: (v: boolean) => void
-  rejectReason: string
-  onRejectReasonChange: (v: string) => void
-  vendorActionLoading: 'accept' | 'reject' | null
-  onSubmit: () => void
-}) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Decline booking</DialogTitle>
-          <DialogDescription>
-            The customer will see this reason in the chat.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-2">
-          <Label htmlFor="reject-reason">Reason</Label>
-          <Textarea
-            id="reject-reason"
-            value={rejectReason}
-            onChange={(e) => onRejectReasonChange(e.target.value)}
-            rows={3}
-            placeholder="Brief reason…"
-          />
-        </div>
-        <DialogFooter className="gap-2 sm:gap-0">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            variant="destructive"
-            disabled={vendorActionLoading !== null || rejectReason.trim().length < 3}
-            onClick={() => void onSubmit()}
-          >
-            {vendorActionLoading === 'reject' ? 'Declining…' : 'Decline'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-function DeleteConfirmDialog({
-  open,
-  onOpenChange,
-  messageContent,
-  loading,
-  onConfirm,
-}: {
-  open: boolean
-  onOpenChange: (v: boolean) => void
-  messageContent: string
-  loading: boolean
-  onConfirm: () => void
-}) {
-  return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent size="sm">
-        <AlertDialogHeader>
-          <AlertDialogTitle>Delete message?</AlertDialogTitle>
-          <AlertDialogDescription>
-            This cannot be undone. The message &ldquo;
-            {messageContent.length > 60
-              ? `${messageContent.slice(0, 60)}…`
-              : messageContent}
-            &rdquo; will be removed for everyone.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            variant="destructive"
-            onClick={() => void onConfirm()}
-            disabled={loading}
-          >
-            {loading ? 'Deleting…' : 'Delete'}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
   )
 }

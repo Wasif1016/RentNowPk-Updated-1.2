@@ -7,6 +7,7 @@ export type VendorVehicleListRow = {
   name: string
   slug: string
   isActive: boolean
+  year: number
   coverUrl: string | null
   makeLogoUrl: string | null
   cities: string[]
@@ -33,6 +34,7 @@ export async function listVendorVehiclesWithMeta(
       name: vehicles.name,
       slug: vehicles.slug,
       isActive: vehicles.isActive,
+      year: vehicles.year,
       coverUrl: vehicleImages.url,
       makeLogoUrl: vehicles.makeLogoUrl,
       pickupFormattedAddress: vehicles.pickupFormattedAddress,
@@ -70,6 +72,7 @@ export async function listVendorVehiclesWithMeta(
     name: v.name,
     slug: v.slug,
     isActive: v.isActive,
+    year: v.year,
     coverUrl: v.coverUrl,
     makeLogoUrl: v.makeLogoUrl,
     cities: cityMap.get(v.id) ?? [],

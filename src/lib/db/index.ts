@@ -10,20 +10,18 @@ const globalForDb = globalThis as unknown as {
   postgres: ReturnType<typeof postgres> | undefined;
 };
 
+// Sanitize connection string (strip parameters if using PgBouncer/transaction mode)
 const client =
   globalForDb.postgres ??
-  postgres(connectionString, {
-    // Allow concurrent queries (e.g. Promise.all on admin routes). With max: 1, every
-    // parallel DB call queues on one connection — latency stacks (RTT × N) and feels
-    // like multi-minute loads on remote Supabase. Pooler-friendly small pool is fine.
-    max: 5,
-    // Required for Supabase pooler (PgBouncer, port 6543 / transaction mode):
-    // prepared statements are not supported across pooled connections.
+  postgres(connectionString.split("?")[0], {
+    max: 10,
     prepare: false,
-    // Reduce flaky ECONNRESETs with remote poolers (idle disconnects, TLS).
-    connect_timeout: 30,
-    idle_timeout: 20,
-    max_lifetime: 60 * 30,
+    ssl: "require",
+    // Fail fast if pool is full or connection is slow (remote RTT is ~200ms)
+    connect_timeout: 10,
+    // Clear idle connections faster to help with pool exhaustion during HMR
+    idle_timeout: 10,
+    max_lifetime: 60 * 5,
   });
 
 if (process.env.NODE_ENV !== "production") {

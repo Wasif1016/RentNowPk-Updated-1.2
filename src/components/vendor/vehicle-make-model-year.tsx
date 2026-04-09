@@ -166,36 +166,38 @@ export function VehicleMakeModelYear({
 
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-muted-foreground text-sm">
-          Make and model default to the NHTSA vPIC catalog (US). Use the toggle to type them
-          yourself if needed.
+      <div className="md:col-span-2 flex flex-wrap items-center justify-between gap-3 bg-muted/20 p-4 border-l-4 border-primary">
+        <p className="text-[11px] font-bold text-[#5c5c55] uppercase tracking-tight">
+          Defaulting to NHTSA vPIC catalog. Toggle to enter manually if needed.
         </p>
         <div className="flex items-center gap-2">
           <Checkbox
             id="vehicle-mmy-manual"
             checked={manualMode}
             onCheckedChange={(v) => onManualChange(v === true)}
+            className="h-4 w-4 border-2 border-primary rounded-none data-[state=checked]:bg-primary"
           />
-          <Label htmlFor="vehicle-mmy-manual" className="text-muted-foreground text-sm font-normal">
-            Enter make &amp; model manually
-          </Label>
+          <label htmlFor="vehicle-mmy-manual" className="text-[11px] font-bold text-primary cursor-pointer uppercase tracking-widest">
+            Manual entry
+          </label>
         </div>
       </div>
 
-      <div className="grid gap-6 sm:grid-cols-2">
-        <Field data-invalid={!!fieldErrors?.make}>
-          <FieldLabel htmlFor={manualMode ? 'vehicle-make' : 'vehicle-make-combo'}>Make</FieldLabel>
+      <div className="md:col-span-1">
+        <Field
+          label="Make"
+          error={fieldErrors?.make}
+          required
+        >
           {manualMode ? (
-            <div className="flex items-center gap-3">
-              {makeLogoPreviewUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element -- external Logo.dev preview URL
+            <div className="flex items-center gap-3 border-2 border-[#d4d4c8] bg-white focus-within:border-primary transition-all">
+              {makeLogoPreviewUrl && (
                 <img
                   src={makeLogoPreviewUrl}
                   alt=""
-                  className="bg-muted size-10 shrink-0 rounded-full object-contain p-1 ring-1 ring-border"
+                  className="size-10 shrink-0 object-contain p-1 ml-2"
                 />
-              ) : null}
+              )}
               <Input
                 id="vehicle-make"
                 name="make"
@@ -203,8 +205,7 @@ export function VehicleMakeModelYear({
                 value={makeStr}
                 onChange={(e) => setMakeStr(e.target.value)}
                 autoComplete="off"
-                className="bg-card border-border min-w-0 flex-1"
-                aria-invalid={!!fieldErrors?.make}
+                className="border-none h-14 font-bold text-sm bg-transparent shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none w-full"
               />
             </div>
           ) : (
@@ -217,47 +218,40 @@ export function VehicleMakeModelYear({
                     type="button"
                     variant="outline"
                     role="combobox"
-                    aria-expanded={makeOpen}
                     disabled={loadingMakes}
                     className={cn(
-                      'border-border bg-card h-auto min-h-9 w-full justify-between rounded-4xl px-3 py-2 font-normal',
-                      !makeStr && 'text-muted-foreground'
+                      'border-2 border-[#d4d4c8] bg-white h-14 w-full justify-between rounded-none px-4 font-bold text-sm hover:bg-white hover:border-primary transition-all',
+                      !makeStr && 'text-[#5c5c55]'
                     )}
-                    aria-invalid={!!fieldErrors?.make}
                   >
-                    <span className="flex min-w-0 items-center gap-2">
+                    <span className="flex items-center gap-3">
                       {makeStr ? (
                         <>
                           {makeLogoPreviewUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element -- Logo.dev preview
                             <img
                               src={makeLogoPreviewUrl}
                               alt=""
-                              className="bg-muted size-8 shrink-0 rounded-full object-contain p-0.5 ring-1 ring-border"
+                              className="size-8 shrink-0 object-contain"
                             />
                           ) : (
-                            <span className="bg-muted text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-medium">
+                            <span className="bg-muted text-primary flex size-8 shrink-0 items-center justify-center text-[10px] font-black uppercase">
                               {initials(makeStr)}
                             </span>
                           )}
-                          <span className="text-foreground truncate">{makeStr}</span>
+                          <span className="truncate">{makeStr}</span>
                         </>
                       ) : (
-                        <span>{loadingMakes ? 'Loading makes…' : 'Search make…'}</span>
+                        <span>{loadingMakes ? 'Loading catalog…' : 'Select make…'}</span>
                       )}
                     </span>
-                    <HugeiconsIcon
-                      icon={ArrowDown01Icon}
-                      strokeWidth={2}
-                      className="size-4 shrink-0 opacity-50"
-                    />
+                    <HugeiconsIcon icon={ArrowDown01Icon} className="size-4 shrink-0 opacity-40" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
-                  <Command>
-                    <CommandInput placeholder="Search make…" />
-                    <CommandList>
-                      <CommandEmpty>No make found.</CommandEmpty>
+                <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0 border-2 border-primary rounded-none shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]" align="start">
+                  <Command className="rounded-none">
+                    <CommandInput placeholder="Search catalog…" className="h-12 border-none focus:ring-0 rounded-none font-bold" />
+                    <CommandList className="max-h-[300px]">
+                      <CommandEmpty className="py-6 text-center text-xs font-bold uppercase text-[#5c5c55]">No results found.</CommandEmpty>
                       <CommandGroup>
                         {makes.map((m) => {
                           const makeRowLogo = logoDevMakeImageUrl(m.name, logoDevPublishableKey, 40)
@@ -273,20 +267,22 @@ export function VehicleMakeModelYear({
                                 void loadModelsForMake(m.id)
                                 setMakeOpen(false)
                               }}
+                              className="py-3 px-4 aria-selected:bg-primary aria-selected:text-white rounded-none cursor-pointer"
                             >
-                              {makeRowLogo ? (
-                                // eslint-disable-next-line @next/next/no-img-element -- Logo.dev CDN
-                                <img
-                                  src={makeRowLogo}
-                                  alt=""
-                                  className="bg-muted size-8 shrink-0 rounded-full object-contain p-0.5 ring-1 ring-border"
-                                />
-                              ) : (
-                                <span className="bg-muted text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-medium">
-                                  {initials(m.name)}
-                                </span>
-                              )}
-                              <span className="truncate">{m.name}</span>
+                              <div className="flex items-center gap-3">
+                                {makeRowLogo ? (
+                                  <img
+                                    src={makeRowLogo}
+                                    alt=""
+                                    className="size-8 shrink-0 object-contain bg-white p-0.5 border border-muted"
+                                  />
+                                ) : (
+                                  <span className="bg-muted text-primary flex size-8 shrink-0 items-center justify-center text-[10px] font-black uppercase">
+                                    {initials(m.name)}
+                                  </span>
+                                )}
+                                <span className="font-bold text-sm">{m.name}</span>
+                              </div>
                             </CommandItem>
                           )
                         })}
@@ -297,11 +293,15 @@ export function VehicleMakeModelYear({
               </Popover>
             </>
           )}
-          {fieldErrors?.make ? <FieldError>{fieldErrors.make}</FieldError> : null}
         </Field>
+      </div>
 
-        <Field data-invalid={!!fieldErrors?.model}>
-          <FieldLabel htmlFor={manualMode ? 'vehicle-model' : 'vehicle-model-combo'}>Model</FieldLabel>
+      <div className="md:col-span-1">
+        <Field
+          label="Model"
+          error={fieldErrors?.model}
+          required
+        >
           {manualMode ? (
             <Input
               id="vehicle-model"
@@ -310,8 +310,7 @@ export function VehicleMakeModelYear({
               value={modelStr}
               onChange={(e) => setModelStr(e.target.value)}
               autoComplete="off"
-              className="bg-card border-border"
-              aria-invalid={!!fieldErrors?.model}
+              className="bg-white border-2 border-[#d4d4c8] h-14 font-bold text-sm focus:border-primary transition-all rounded-none"
             />
           ) : (
             <>
@@ -323,45 +322,39 @@ export function VehicleMakeModelYear({
                     type="button"
                     variant="outline"
                     role="combobox"
-                    aria-expanded={modelOpen}
                     disabled={modelDisabled}
                     className={cn(
-                      'border-border bg-card h-auto min-h-9 w-full justify-between rounded-4xl px-3 py-2 font-normal',
-                      !modelStr && 'text-muted-foreground'
+                      'border-2 border-[#d4d4c8] bg-white h-14 w-full justify-between rounded-none px-4 font-bold text-sm hover:bg-white hover:border-primary transition-all',
+                      !modelStr && 'text-[#5c5c55]'
                     )}
-                    aria-invalid={!!fieldErrors?.model}
                   >
-                    <span className="flex min-w-0 items-center gap-2">
+                    <span className="flex items-center gap-3">
                       {modelStr ? (
                         <>
-                          <span className="bg-muted text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-medium">
+                          <span className="bg-muted text-primary flex size-8 shrink-0 items-center justify-center text-[10px] font-black uppercase">
                             {initials(modelStr)}
                           </span>
-                          <span className="text-foreground truncate">{modelStr}</span>
+                          <span className="truncate">{modelStr}</span>
                         </>
                       ) : (
                         <span>
                           {selectedMakeId === null
-                            ? 'Select a make first'
+                            ? 'Select make first'
                             : loadingModels
                               ? 'Loading models…'
-                              : 'Search model…'}
+                              : 'Select model…'}
                         </span>
                       )}
                     </span>
-                    <HugeiconsIcon
-                      icon={ArrowDown01Icon}
-                      strokeWidth={2}
-                      className="size-4 shrink-0 opacity-50"
-                    />
+                    <HugeiconsIcon icon={ArrowDown01Icon} className="size-4 shrink-0 opacity-40" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
-                  <Command>
-                    <CommandInput placeholder="Search model…" disabled={models.length === 0} />
-                    <CommandList>
-                      <CommandEmpty>
-                        {selectedMakeId === null ? 'Select a make first.' : 'No model found.'}
+                <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0 border-2 border-primary rounded-none shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]" align="start">
+                  <Command className="rounded-none">
+                    <CommandInput placeholder="Search models…" disabled={models.length === 0} className="h-12 border-none focus:ring-0 rounded-none font-bold" />
+                    <CommandList className="max-h-[300px]">
+                      <CommandEmpty className="py-6 text-center text-xs font-bold uppercase text-[#5c5c55]">
+                        {selectedMakeId === null ? 'Select make first.' : 'No models found.'}
                       </CommandEmpty>
                       <CommandGroup>
                         {models.map((m) => (
@@ -372,11 +365,14 @@ export function VehicleMakeModelYear({
                               setModelStr(m.name)
                               setModelOpen(false)
                             }}
+                            className="py-3 px-4 aria-selected:bg-primary aria-selected:text-white rounded-none cursor-pointer"
                           >
-                            <span className="bg-muted text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-medium">
-                              {initials(m.name)}
-                            </span>
-                            <span className="truncate">{m.name}</span>
+                            <div className="flex items-center gap-3">
+                              <span className="bg-muted text-primary flex size-8 shrink-0 items-center justify-center text-[10px] font-black uppercase">
+                                {initials(m.name)}
+                              </span>
+                              <span className="font-bold text-sm">{m.name}</span>
+                            </div>
                           </CommandItem>
                         ))}
                       </CommandGroup>
@@ -386,31 +382,29 @@ export function VehicleMakeModelYear({
               </Popover>
             </>
           )}
-          {fieldErrors?.model ? <FieldError>{fieldErrors.model}</FieldError> : null}
         </Field>
       </div>
 
-      <Field data-invalid={!!fieldErrors?.year}>
-        <FieldLabel htmlFor="vehicle-year-select">Year</FieldLabel>
-        <input type="hidden" name="year" value={yearStr} />
-        <Select value={yearStr} onValueChange={setYearStr}>
-          <SelectTrigger
-            id="vehicle-year-select"
-            className="bg-card border-border w-full sm:max-w-48"
-            aria-invalid={!!fieldErrors?.year}
-          >
-            <SelectValue placeholder="Year" />
-          </SelectTrigger>
-          <SelectContent>
-            {YEAR_OPTIONS.map((y) => (
-              <SelectItem key={y} value={y}>
-                {y}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {fieldErrors?.year ? <FieldError>{fieldErrors.year}</FieldError> : null}
-      </Field>
+      <div className="md:col-span-1">
+        <Field label="Model year" error={fieldErrors?.year} required>
+          <input type="hidden" name="year" value={yearStr} />
+          <Select value={yearStr} onValueChange={setYearStr}>
+            <SelectTrigger
+              id="vehicle-year-select"
+              className="bg-white border-2 border-[#d4d4c8] h-14 w-full font-bold text-sm focus:border-primary transition-all rounded-none"
+            >
+              <SelectValue placeholder="Year" />
+            </SelectTrigger>
+            <SelectContent className="rounded-none border-2 border-primary shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+              {YEAR_OPTIONS.map((y) => (
+                <SelectItem key={y} value={y} className="font-bold py-3 cursor-pointer focus:bg-primary focus:text-white rounded-none">
+                  {y}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+      </div>
     </>
   )
 }

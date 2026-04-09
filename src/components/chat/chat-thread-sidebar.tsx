@@ -4,8 +4,6 @@ import { format } from 'date-fns'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
-import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
 import type { BookingListRow } from '@/lib/db/chat'
 import { formatUnreadBadge } from '@/lib/format/unread'
 import { cn } from '@/lib/utils'
@@ -26,25 +24,6 @@ function initials(name: string): string {
   if (parts.length === 0) return '?'
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-}
-
-const AVATAR_COLORS = [
-  'bg-blue-100 text-blue-700',
-  'bg-amber-100 text-amber-700',
-  'bg-green-100 text-green-700',
-  'bg-purple-100 text-purple-700',
-  'bg-rose-100 text-rose-700',
-  'bg-cyan-100 text-cyan-700',
-  'bg-indigo-100 text-indigo-700',
-  'bg-orange-100 text-orange-700',
-]
-
-function avatarColor(name: string): string {
-  let hash = 0
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash)
-  }
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
 }
 
 function relativeTime(date: Date): string {
@@ -80,39 +59,33 @@ export function ChatThreadSidebar({
   })
 
   return (
-    <aside className="flex w-full max-w-[min(100%,320px)] shrink-0 flex-col border-r border-border bg-card">
-      {/* Header */}
-      <div className="border-b border-border px-4 py-4">
-        <p className="text-sm font-semibold text-foreground">Conversations</p>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          {rows.length} booking{rows.length === 1 ? '' : 's'}
-        </p>
+    <aside className="flex w-full md:max-w-[360px] shrink-0 flex-col bg-[#f9f9ff] text-[#071c36] font-['Plus_Jakarta_Sans'] border-r-2 border-[#000615]">
+      {/* Header - Desktop specific within sidebar if used in desktop layout */}
+      <div className="hidden md:flex p-6 border-b-2 border-[#000615] bg-[#0B1F3A] items-center gap-4 shadow-[4px_4px_0px_0px_#000]">
+        <span className="material-symbols-outlined text-[#F5A623]">chat_bubble</span>
+        <h2 className="text-xl font-black text-[#F5A623] font-['Space_Grotesk'] uppercase tracking-tighter">Messages</h2>
       </div>
 
-      {/* Search */}
-      <div className="border-b border-border p-3">
-        <div className="relative">
-          <svg
-            className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/60"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search conversations..."
-            className="h-9 pl-9 text-sm rounded-xl bg-muted/50 border-border/50 focus:bg-background"
-            aria-label="Search conversations"
-          />
+      {/* Search Section */}
+      <div className="p-4 bg-white border-b-2 border-[#000615]">
+        <div className="relative group">
+          <div className="flex items-center bg-white border-2 border-[#000615] shadow-[4px_4px_0px_0px_rgba(0,6,21,1)] focus-within:shadow-[4px_4px_0px_0px_#F5A623] transition-all">
+            <div className="pl-4 text-[#000615]">
+              <span className="material-symbols-outlined text-sm font-bold">search</span>
+            </div>
+            <input 
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full bg-transparent border-none focus:ring-0 font-bold text-[10px] uppercase tracking-widest p-3 placeholder:text-[#000615]/20" 
+              placeholder="SEARCH CONVERSATIONS..." 
+              type="text"
+            />
+          </div>
         </div>
       </div>
 
-      {/* Status filter chips */}
-      <div className="flex flex-wrap gap-1.5 border-b border-border px-3 py-2">
+      {/* Status filter chips - Optional but kept for utility, redesigned */}
+      <div className="flex flex-wrap gap-2 px-4 py-3 bg-[#f0f3ff] border-b-2 border-[#000615]">
         <StatusChip
           label="All"
           active={statusFilter === 'ALL'}
@@ -129,56 +102,83 @@ export function ChatThreadSidebar({
       </div>
 
       {/* Conversation list */}
-      <nav className="min-h-0 flex-1 overflow-y-auto divide-y divide-border/50">
+      <nav className="min-h-0 flex-1 overflow-y-auto no-scrollbar py-4 px-4 space-y-4">
         {filtered.length === 0 ? (
-          <p className="text-muted-foreground px-4 py-6 text-xs text-center">
-            {rows.length === 0 ? 'No conversations yet.' : 'No matches for this filter.'}
-          </p>
+          <div className="py-12 flex flex-col items-center text-center">
+            <div className="bg-[#f0f3ff] border-2 border-[#000615] p-6 mb-4 shadow-[4px_4px_0px_0px_rgba(0,6,21,1)]">
+                <span className="material-symbols-outlined text-4xl text-[#000615]">chat_bubble_outline</span>
+            </div>
+            <h2 className="font-['Space_Grotesk'] font-black text-sm uppercase text-[#000615]">No Entries</h2>
+          </div>
         ) : (
-          <ul>
+          <ul className="space-y-4">
             {filtered.map((row) => {
               const href = `${normalizedBase}/${row.bookingId}`
               const active = pathname === href || pathname.startsWith(`${href}/`)
-              const unreadLabel = formatUnreadBadge(row.unreadCount)
-              const color = avatarColor(row.otherPartyName)
+              const unreadCount = row.unreadCount
+              const unreadLabel = formatUnreadBadge(unreadCount)
 
               return (
                 <li key={row.bookingId}>
                   <Link
                     href={href}
                     className={cn(
-                      'flex gap-3 items-start p-4 transition-all cursor-pointer',
-                      active
-                        ? 'bg-gradient-to-r from-primary/5 to-transparent border-l-[3px] border-l-primary'
-                        : 'hover:bg-muted/50 border-l-[3px] border-l-transparent'
+                      'block relative bg-white border-2 border-[#000615] transition-all cursor-pointer group',
+                      active 
+                        ? 'translate-x-[2px] translate-y-[2px] shadow-[4px_4px_0px_0px_#F5A623]' 
+                        : 'shadow-[6px_6px_0px_0px_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[4px_4px_0px_0px_#000]'
                     )}
                   >
-                    {/* Avatar */}
-                    <div className={cn('h-10 w-10 rounded-full flex items-center justify-center text-sm font-semibold shrink-0', color)}>
-                      {initials(row.otherPartyName)}
-                    </div>
-
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-baseline">
-                        <p className="font-semibold text-foreground text-sm truncate">
-                          {row.otherPartyName}
-                        </p>
-                        <span className="text-xs text-muted-foreground/60 shrink-0 ml-2">
-                          {relativeTime(row.lastMessageAt ?? row.pickupAt)}
-                        </span>
+                    <div className={cn("flex p-4 gap-4", !active && unreadCount === 0 && "bg-[#f0f3ff]/50")}>
+                      {/* Avatar */}
+                      <div className="relative flex-shrink-0">
+                        <div className={cn(
+                          "w-14 h-14 border-2 border-[#000615] flex items-center justify-center font-['Space_Grotesk'] font-black text-lg shadow-[2px_2px_0px_0px_#000]",
+                          unreadCount > 0 ? "bg-[#feae2c] text-[#000615]" : "bg-white text-[#000615]/40 grayscale"
+                        )}>
+                           {initials(row.otherPartyName)}
+                        </div>
+                        <div className="absolute -bottom-1 -right-1 bg-[#feae2c] border-2 border-[#000615] p-0.5 shadow-[1px_1px_0px_0px_#000]">
+                          <span className="material-symbols-outlined text-[10px] text-[#000615] font-black leading-none">
+                             {row.status === 'CONFIRMED' ? 'electric_car' : 'history'}
+                          </span>
+                        </div>
                       </div>
-                      <p className="text-sm text-muted-foreground truncate mt-0.5">
-                        {row.lastMessagePreview || row.vehicleName}
-                      </p>
-                      {unreadLabel ? (
-                        <Badge
-                          variant="default"
-                          className="mt-1.5 text-[10px] px-1.5 py-0 h-4"
-                        >
-                          {unreadLabel}
-                        </Badge>
-                      ) : null}
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between items-start mb-0.5">
+                          <h3 className={cn(
+                            "font-['Space_Grotesk'] font-black text-base uppercase leading-none truncate",
+                            unreadCount > 0 ? "text-[#000615]" : "text-[#000615]/60"
+                          )}>
+                            {row.otherPartyName}
+                          </h3>
+                          <span className="font-bold text-[9px] text-[#000615]/40 uppercase shrink-0 ml-2">
+                            {relativeTime(row.lastMessageAt ?? row.pickupAt)}
+                          </span>
+                        </div>
+                        <p className={cn(
+                          "font-bold text-[9px] uppercase tracking-tight mb-1",
+                          unreadCount > 0 ? "text-[#feae2c]" : "text-[#000615]/20"
+                        )}>
+                          {row.vehicleName}
+                        </p>
+                        <p className={cn(
+                          "text-xs truncate font-medium",
+                          unreadCount > 0 ? "text-[#000615] font-bold" : "text-[#000615]/50"
+                        )}>
+                          {row.lastMessagePreview || 'New inquiry received.'}
+                        </p>
+                      </div>
+
+                      {unreadCount > 0 && (
+                        <div className="flex flex-col items-end justify-center ml-2">
+                          <div className="w-6 h-6 bg-[#feae2c] border-2 border-[#000615] flex items-center justify-center shadow-[2px_2px_0px_0px_rgba(0,6,21,1)]">
+                            <span className="font-['Space_Grotesk'] font-black text-[10px] text-[#000615]">{unreadLabel}</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </Link>
                 </li>
@@ -205,10 +205,10 @@ function StatusChip({
       type="button"
       onClick={onClick}
       className={cn(
-        'px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors',
+        'px-4 py-1.5 border-2 text-[9px] font-black uppercase tracking-widest transition-all active:translate-y-0.5',
         active
-          ? 'bg-primary text-white'
-          : 'bg-muted/50 text-muted-foreground hover:bg-muted border border-border/50'
+          ? 'bg-[#000615] text-white border-[#000615] shadow-[2px_2px_0px_0px_#F5A623]'
+          : 'bg-white text-[#000615] border-[#000615] shadow-[2px_2px_0px_0px_#000] hover:translate-y-[-1px]'
       )}
     >
       {label}

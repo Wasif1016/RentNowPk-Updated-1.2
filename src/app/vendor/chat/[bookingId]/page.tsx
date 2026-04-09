@@ -45,10 +45,15 @@ export default async function VendorChatThreadPage({
         currentUserId={user.id}
         title={ctx.vehicleName}
         subtitle={`${ctx.otherPartyName} · ${ctx.status.replace(/_/g, ' ')}`}
-        layout="embedded"
+        layout="standalone"
+        backHref="/vendor/chat"
         bookingStatus={ctx.status}
         isVendor
         vehicles={vehicles}
+        pickupAt={ctx.pickupAt}
+        dropoffAt={ctx.dropoffAt}
+        pickupAddress={ctx.pickupAddress}
+        vehicleCoverUrl={ctx.vehicleCoverUrl}
       />
     </BookingChatShell>
   )

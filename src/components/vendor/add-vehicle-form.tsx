@@ -9,7 +9,7 @@ import {
   useState,
 } from 'react'
 import { useRouter } from 'next/navigation'
-import { GripVertical, ImagePlus, Loader2, X, Car, MapPin, DollarSign } from 'lucide-react'
+import { GripVertical, ImagePlus, Loader2, X, Car, MapPin, DollarSign, CheckCircle, Info } from 'lucide-react'
 import {
   createVehicle,
   type CreateVehicleFieldKey,
@@ -162,286 +162,265 @@ export function AddVehicleForm({ logoDevPublishableKey }: AddVehicleFormProps) {
   }
 
   return (
-    <>
-    <form
-      onSubmit={handleSubmit}
-      className="max-w-3xl space-y-6"
-      encType="multipart/form-data"
-      aria-busy={pending}
-    >
-      <input type="hidden" name="coverIndex" value={String(effectiveCoverIndex)} />
-      {withDriver ? <input type="hidden" name="withDriverEnabled" value="on" /> : null}
-      {selfDrive ? <input type="hidden" name="selfDriveEnabled" value="on" /> : null}
+    <div className="font-sans" style={{ fontFamily: 'Arial, sans-serif' }}>
+      <form
+        onSubmit={handleSubmit}
+        className="space-y-12"
+        encType="multipart/form-data"
+        aria-busy={pending}
+      >
+        <input type="hidden" name="coverIndex" value={String(effectiveCoverIndex)} />
+        {withDriver ? <input type="hidden" name="withDriverEnabled" value="on" /> : null}
+        {selfDrive ? <input type="hidden" name="selfDriveEnabled" value="on" /> : null}
 
-      {bannerError && !state?.fieldErrors && (
-        <div className="rounded-xl bg-destructive/5 border border-destructive/20 p-4">
-          <p className="text-sm text-destructive">{bannerError}</p>
-        </div>
-      )}
+        {bannerError && !state?.fieldErrors && (
+          <div className="bg-[#ffdad6] border-2 border-[#ba1a1a] p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] animate-in fade-in slide-in-from-top-4">
+            <p className="text-xs font-bold text-[#ba1a1a] uppercase tracking-widest">{bannerError}</p>
+          </div>
+        )}
 
-      {/* Vehicle Details */}
-      <SectionCard icon={Car} title="Vehicle details" description="Basic information about your vehicle.">
-        <div className="space-y-4">
-          <Field
-            label="Vehicle name"
-            error={fieldError(fe, 'name')}
-            description="e.g. Toyota Corolla 2024"
-          >
-            <Input
-              id="vehicle-name"
-              name="name"
-              required
-              autoComplete="off"
-              placeholder="e.g. Toyota Corolla"
-              className={cn('bg-muted/50 border-border/50 focus:bg-background', fieldError(fe, 'name') && 'border-destructive')}
-              aria-invalid={!!fieldError(fe, 'name')}
+        {/* Section 1: Vehicle Details */}
+        <section className="form-section">
+          <h2 className="text-[20px] font-bold text-primary mb-8 pb-3 border-b-2 border-primary">Vehicle details</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="md:col-span-2">
+              <Field
+                label="Vehicle display name"
+                error={fieldError(fe, 'name')}
+                hint="How your vehicle appears in search"
+                required
+              >
+                <Input
+                  id="vehicle-name"
+                  name="name"
+                  required
+                  autoComplete="off"
+                  placeholder="e.g., Toyota Corolla Altis"
+                  className={cn(
+                    'field-input bg-white h-14 text-sm font-bold border-2 border-[#d4d4c8] focus:border-primary transition-all rounded-none',
+                    fieldError(fe, 'name') && 'border-red-600'
+                  )}
+                />
+              </Field>
+            </div>
+
+            <VehicleMakeModelYear
+              logoDevPublishableKey={logoDevPublishableKey}
+              fieldErrors={
+                fe
+                  ? {
+                      make: fieldError(fe, 'make'),
+                      model: fieldError(fe, 'model'),
+                      year: fieldError(fe, 'year'),
+                    }
+                  : undefined
+              }
             />
-          </Field>
+          </div>
+        </section>
 
-          <VehicleMakeModelYear
-            logoDevPublishableKey={logoDevPublishableKey}
-            fieldErrors={
-              fe
-                ? {
-                    make: fieldError(fe, 'make'),
-                    model: fieldError(fe, 'model'),
-                    year: fieldError(fe, 'year'),
-                  }
-                : undefined
-            }
+        {/* Section 2: Location & Availability */}
+        <section className="form-section">
+          <h2 className="text-[20px] font-bold text-primary mb-8 pb-3 border-b-2 border-primary">Location & availability</h2>
+          <div className="space-y-6">
+            <VehiclePickupMap
+              fieldError={
+                fieldError(fe, 'pickup') ??
+                fieldError(fe, 'pickupLatitude') ??
+                fieldError(fe, 'pickupLongitude')
+              }
+            />
+          </div>
+        </section>
+
+        {/* Section 3: Pricing */}
+        <section className="form-section">
+          <h2 className="text-[20px] font-bold text-primary mb-8 pb-3 border-b-2 border-primary">Pricing</h2>
+          <div className="space-y-10">
+            {(fieldError(fe, 'withDriverEnabled') || fieldError(fe, 'selfDriveEnabled')) && (
+              <p className="text-xs font-bold text-red-600 border-2 border-red-600 p-3 bg-red-50">
+                {fieldError(fe, 'withDriverEnabled') ?? fieldError(fe, 'selfDriveEnabled')}
+              </p>
+            )}
+
+            <div className="grid grid-cols-1 gap-12">
+              <DriveTypePriceRow
+                id="with-driver"
+                label="With Chauffeur (Daily Rate)"
+                checked={withDriver}
+                onCheckedChange={(v) => setWithDriver(v === true)}
+                dayError={fieldError(fe, 'priceWithDriverDay')}
+                dayName="priceWithDriverDay"
+                dayId="pwd-day"
+              />
+
+              <DriveTypePriceRow
+                id="self-drive"
+                label="Self Drive Only (Daily Rate)"
+                checked={selfDrive}
+                onCheckedChange={(v) => setSelfDrive(v === true)}
+                dayError={fieldError(fe, 'priceSelfDriveDay')}
+                dayName="priceSelfDriveDay"
+                dayId="psd-day"
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* Section 4: Vehicle Photos */}
+        <section className="form-section">
+          <h2 className="text-[20px] font-bold text-primary mb-8 pb-3 border-b-2 border-primary">Vehicle photos</h2>
+          
+          <input
+            ref={fileInputRef}
+            id="vehicle-images"
+            type="file"
+            accept={ACCEPT}
+            multiple
+            className="sr-only"
+            onChange={onFilesChange}
+            aria-hidden
           />
-        </div>
-      </SectionCard>
 
-      {/* Pickup Location */}
-      <SectionCard icon={MapPin} title="Pickup location" description="Where customers will pick up the vehicle.">
-        <VehiclePickupMap
-          fieldError={
-            fieldError(fe, 'pickup') ??
-            fieldError(fe, 'pickupLatitude') ??
-            fieldError(fe, 'pickupLongitude')
-          }
-        />
-      </SectionCard>
-
-      {/* Drive Types & Pricing */}
-      <SectionCard icon={DollarSign} title="Drive types & pricing" description="Enable at least one option and set prices in PKR.">
-        <div className="space-y-4">
-          {(fieldError(fe, 'withDriverEnabled') || fieldError(fe, 'selfDriveEnabled')) && (
-            <p className="text-sm text-destructive">
-              {fieldError(fe, 'withDriverEnabled') ?? fieldError(fe, 'selfDriveEnabled')}
-            </p>
-          )}
-
-          <DriveTypeSection
-            id="with-driver"
-            label="With driver"
-            checked={withDriver}
-            onCheckedChange={(v) => setWithDriver(v === true)}
-            dayError={fieldError(fe, 'priceWithDriverDay')}
-            monthError={fieldError(fe, 'priceWithDriverMonth')}
-            dayName="priceWithDriverDay"
-            monthName="priceWithDriverMonth"
-            dayId="pwd-day"
-            monthId="pwd-month"
-          />
-
-          <DriveTypeSection
-            id="self-drive"
-            label="Self drive"
-            checked={selfDrive}
-            onCheckedChange={(v) => setSelfDrive(v === true)}
-            dayError={fieldError(fe, 'priceSelfDriveDay')}
-            monthError={fieldError(fe, 'priceSelfDriveMonth')}
-            dayName="priceSelfDriveDay"
-            monthName="priceSelfDriveMonth"
-            dayId="psd-day"
-            monthId="psd-month"
-          />
-        </div>
-      </SectionCard>
-
-      {/* Photos */}
-      <SectionCard icon={ImagePlus} title="Photos" description={`Up to ${MAX_FILES} images. Drag to reorder. The cover photo appears on listings.`}>
-        <input
-          ref={fileInputRef}
-          id="vehicle-images"
-          type="file"
-          accept={ACCEPT}
-          multiple
-          className="sr-only"
-          onChange={onFilesChange}
-          aria-hidden
-        />
-
-        <div
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => fileInputRef.current?.click()}
+            onDragOver={(e) => {
               e.preventDefault()
-              fileInputRef.current?.click()
-            }
-          }}
-          onClick={() => fileInputRef.current?.click()}
-          onDragOver={(e) => {
-            e.preventDefault()
-            e.stopPropagation()
-          }}
-          onDrop={onDropZoneDrop}
-          className={cn(
-            'border-border bg-muted/30 hover:bg-muted/50 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-8 transition-colors',
-            fieldError(fe, 'images') && 'border-destructive'
+              e.stopPropagation()
+            }}
+            onDrop={onDropZoneDrop}
+            className={cn(
+              'border-2 border-dashed border-[#d4d4c8] bg-[#fafaf8] py-12 px-6 text-center cursor-pointer transition-all hover:border-primary',
+              fieldError(fe, 'images') && 'border-red-600'
+            )}
+          >
+            <div className="text-4xl text-[#5c5c55] mb-3">[+]</div>
+            <p className="text-sm font-bold text-primary mb-1">Click to upload or drag and drop</p>
+            <p className="text-xs text-[#5c5c55]">JPG, PNG or WebP (max 5MB each)</p>
+          </div>
+
+          {fieldError(fe, 'images') && (
+            <p className="text-xs font-bold text-red-600 mt-4 border-2 border-red-600 p-3 bg-red-50">{fieldError(fe, 'images')}</p>
           )}
+
+          {fileList.length > 0 && (
+            <div className="mt-8">
+               <p className="text-[11px] font-bold text-[#5c5c55] uppercase tracking-widest mb-4">Current Portfolio (Drag to reorder)</p>
+               <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+                {fileList.map((file, i) => (
+                  <li
+                    key={`${file.name}-${file.size}-${file.lastModified}-${i}`}
+                    draggable
+                    onDragStart={(e) => {
+                      dragFrom.current = i
+                      e.dataTransfer.effectAllowed = 'move'
+                    }}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      onReorderDrop(i)
+                    }}
+                    className="relative group h-full"
+                  >
+                    <div
+                      className={cn(
+                        'relative aspect-square overflow-hidden border-2 border-[#d4d4c8] transition-all',
+                        effectiveCoverIndex === i ? 'border-primary ring-2 ring-primary ring-offset-2' : ''
+                      )}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element -- blob previews */}
+                      <img
+                        src={previewUrls[i]}
+                        alt=""
+                        className="size-full object-cover"
+                      />
+                      
+                      <button
+                        type="button"
+                        className="absolute top-1 right-1 bg-white border-2 border-black p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setFileList((prev) => prev.filter((_, j) => j !== i))
+                        }}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+
+                      {effectiveCoverIndex === i && (
+                         <div className="absolute inset-x-0 bottom-0 bg-primary py-1 text-[9px] font-bold text-white text-center uppercase tracking-widest">
+                            Cover Asset
+                         </div>
+                      )}
+                    </div>
+                    
+                    {effectiveCoverIndex !== i && (
+                      <button
+                        type="button"
+                        className="mt-2 w-full text-[9px] font-bold uppercase tracking-widest text-[#5c5c55] hover:text-black transition-colors"
+                        onClick={() => setCoverIndex(i)}
+                      >
+                        Set as cover
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <p className="text-[12px] text-[#5c5c55] mt-6">
+            First image will be used as the cover photo in search results.
+          </p>
+        </section>
+
+        {/* Form Actions */}
+        <div className="flex flex-col-reverse sm:flex-row justify-end gap-4 pt-10 border-t-2 border-[#d4d4c8] mt-8">
+           <Button 
+            type="button" 
+            variant="ghost" 
+            onClick={() => router.back()}
+            className="bg-transparent text-primary hover:bg-muted font-bold text-[15px] h-auto px-8 py-4 border-2 border-primary shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] rounded-none"
+           >
+            Cancel
+           </Button>
+           <Button 
+             type="submit" 
+             disabled={pending} 
+             className="bg-primary text-white hover:bg-[#feae2c] hover:text-primary font-bold text-[15px] h-auto px-12 py-4 border-2 border-primary shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all rounded-none"
+           >
+            {pending ? (
+              <>
+                <Loader2 className="h-5 w-5 mr-3 animate-spin" />
+                Processing…
+              </>
+            ) : (
+              'Publish vehicle'
+            )}
+           </Button>
+        </div>
+      </form>
+
+      {/* Loading Overlay */}
+       {pending && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-[#000615]/80 backdrop-blur-sm animate-in fade-in"
+          role="status"
+          aria-live="polite"
         >
-          <ImagePlus className="text-muted-foreground size-8" strokeWidth={1.25} />
-          <div className="text-center">
-            <p className="text-foreground text-sm font-medium">Add photos</p>
-            <p className="text-muted-foreground mt-0.5 text-xs">
-              Click or drop · JPEG, PNG, WebP · max {MAX_FILES}
-            </p>
+          <div className="bg-white border-2 border-primary p-12 shadow-[12px_12px_0px_0px_#feae2c] flex flex-col items-center gap-6 animate-in zoom-in duration-300">
+             <div className="h-16 w-16 border-2 border-primary bg-primary flex items-center justify-center shadow-[4px_4px_0px_0px_#feae2c]">
+                <Car className="text-[#feae2c] h-8 w-8" />
+             </div>
+             <div className="text-center">
+                <p className="text-primary text-xl font-bold uppercase tracking-tight mb-2">Registry update</p>
+                <p className="text-[#5c5c55] max-w-[280px] text-[11px] font-bold uppercase tracking-widest leading-relaxed">
+                   Synchronizing your asset with the RentNowPk fleet marketplace.
+                </p>
+             </div>
           </div>
         </div>
-
-        {fieldError(fe, 'images') && (
-          <p className="text-xs text-destructive mt-1">{fieldError(fe, 'images')}</p>
-        )}
-
-        {fileList.length > 0 && (
-          <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {fileList.map((file, i) => (
-              <li
-                key={`${file.name}-${file.size}-${file.lastModified}-${i}`}
-                draggable
-                onDragStart={(e) => {
-                  dragFrom.current = i
-                  e.dataTransfer.effectAllowed = 'move'
-                  e.dataTransfer.setData('text/plain', String(i))
-                }}
-                onDragOver={(e) => {
-                  e.preventDefault()
-                  e.dataTransfer.dropEffect = 'move'
-                }}
-                onDrop={(e) => {
-                  e.preventDefault()
-                  onReorderDrop(i)
-                }}
-                className="group relative"
-              >
-                <div
-                  className={cn(
-                    'border-border bg-card relative aspect-4/3 overflow-hidden rounded-xl border shadow-sm transition-all',
-                    effectiveCoverIndex === i && 'ring-2 ring-primary ring-offset-2 ring-offset-background'
-                  )}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element -- blob previews */}
-                  <img
-                    src={previewUrls[i]}
-                    alt=""
-                    className="size-full object-cover"
-                  />
-                  <div className="absolute top-1 left-1 flex items-center gap-0.5 rounded-md bg-black/55 px-1.5 py-0.5 text-white backdrop-blur-sm">
-                    <GripVertical className="size-3 shrink-0 opacity-90" aria-hidden />
-                    <span className="text-[10px] font-medium">{i + 1}</span>
-                  </div>
-                  {effectiveCoverIndex === i && (
-                    <span className="bg-primary text-primary-foreground absolute bottom-1 right-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold">
-                      Cover
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    className="absolute top-1 right-1 rounded-md bg-black/50 p-1 text-white backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/80"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setFileList((prev) => prev.filter((_, j) => j !== i))
-                      setCoverIndex((ci) => {
-                        if (ci === i) return 0
-                        if (ci > i) return ci - 1
-                        return ci
-                      })
-                    }}
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-                <Button
-                  type="button"
-                  variant={effectiveCoverIndex === i ? 'default' : 'outline'}
-                  size="sm"
-                  className="mt-1.5 h-7 w-full text-[11px]"
-                  onClick={() => setCoverIndex(i)}
-                >
-                  {effectiveCoverIndex === i ? 'Cover photo' : 'Set as cover'}
-                </Button>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {fieldError(fe, 'coverIndex') && (
-          <p className="text-xs text-destructive mt-1">{fieldError(fe, 'coverIndex')}</p>
-        )}
-      </SectionCard>
-
-      {/* Submit */}
-      <div className="flex justify-end pt-2">
-        <Button type="submit" disabled={pending} size="lg" className="rounded-xl px-8">
-          {pending ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Saving…
-            </>
-          ) : (
-            'Save vehicle'
-          )}
-        </Button>
-      </div>
-    </form>
-
-    {pending && (
-      <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm"
-        role="status"
-        aria-live="polite"
-        aria-label="Saving vehicle"
-      >
-        <div className="bg-card flex flex-col items-center gap-3 rounded-2xl border border-border px-8 py-6 shadow-xl">
-          <Loader2 className="text-primary size-8 animate-spin" aria-hidden />
-          <p className="text-foreground text-sm font-medium">Saving vehicle…</p>
-          <p className="text-muted-foreground max-w-xs text-center text-xs">
-            Uploading photos and creating your listing.
-          </p>
-        </div>
-      </div>
-    )}
-    </>
-  )
-}
-
-function SectionCard({
-  icon: Icon,
-  title,
-  description,
-  children,
-}: {
-  icon: React.ComponentType<{ className?: string }>
-  title: string
-  description: string
-  children: React.ReactNode
-}) {
-  return (
-    <div className="rounded-xl bg-card border border-border shadow-sm p-6">
-      <div className="flex items-start gap-3 mb-5">
-        <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-          <Icon className="h-4 w-4 text-primary" />
-        </div>
-        <div>
-          <h3 className="text-base font-semibold text-foreground">{title}</h3>
-          <p className="text-sm text-muted-foreground mt-0.5">{description}</p>
-        </div>
-      </div>
-      {children}
+      )}
     </div>
   )
 }
@@ -449,86 +428,83 @@ function SectionCard({
 function Field({
   label,
   error,
-  description,
+  hint,
+  required,
   children,
 }: {
   label: string
   error?: string
-  description?: string
+  hint?: string
+  required?: boolean
   children: React.ReactNode
 }) {
   return (
-    <div>
-      <label className="block text-sm font-medium text-foreground mb-1.5">{label}</label>
+    <div className="flex flex-col gap-2">
+      <div className="flex justify-between items-center">
+        <label className="text-[13px] font-bold text-primary tracking-wide">
+          {label} {required && <span className="text-red-600">*</span>}
+        </label>
+        {hint && (
+          <span className="text-[11px] font-normal text-[#5c5c55] tracking-tight">{hint}</span>
+        )}
+      </div>
       {children}
-      {error && <p className="text-xs text-destructive mt-1">{error}</p>}
-      {description && !error && <p className="text-xs text-muted-foreground mt-1">{description}</p>}
+      {error && <p className="text-[11px] font-bold text-red-600 uppercase tracking-widest">{error}</p>}
     </div>
   )
 }
 
-function DriveTypeSection({
+function DriveTypePriceRow({
   id,
   label,
   checked,
   onCheckedChange,
   dayError,
-  monthError,
   dayName,
-  monthName,
   dayId,
-  monthId,
 }: {
   id: string
   label: string
   checked: boolean
   onCheckedChange: (v: boolean) => void
   dayError?: string
-  monthError?: string
   dayName: string
-  monthName: string
   dayId: string
-  monthId: string
 }) {
   return (
-    <div className="rounded-lg border border-border/50 p-4 space-y-3">
+    <div className={cn(
+      "space-y-6 transition-all duration-300",
+      !checked && "opacity-40"
+    )}>
       <div className="flex items-center gap-3">
-        <Checkbox id={id} checked={checked} onCheckedChange={(v) => onCheckedChange(v === true)} />
-        <Label htmlFor={id} className="text-sm font-medium text-foreground cursor-pointer">
+        <Checkbox 
+          id={id} 
+          checked={checked} 
+          onCheckedChange={(v) => onCheckedChange(v === true)} 
+          className="h-5 w-5 border-2 border-primary rounded-none data-[state=checked]:bg-primary"
+        />
+        <label htmlFor={id} className="text-sm font-bold text-primary cursor-pointer mt-0.5">
           {label}
-        </Label>
+        </label>
       </div>
 
-      {checked && (
-        <div className="grid gap-3 sm:grid-cols-2 pl-7">
-          <Field label="Price / day" error={dayError}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+        <Field label="Daily rate (PKR)">
+          <div className="flex items-center border-2 border-[#d4d4c8] bg-white focus-within:border-primary">
+            <span className="px-3 font-bold text-primary text-sm shrink-0 border-r-2 border-[#d4d4c8] h-12 flex items-center">Rs</span>
             <Input
               id={dayId}
               name={dayName}
               type="number"
-              inputMode="decimal"
-              step="0.01"
-              min={0}
-              placeholder="0.00"
-              className={cn('bg-muted/50 border-border/50 focus:bg-background', dayError && 'border-destructive')}
-              aria-invalid={!!dayError}
+              placeholder="e.g., 4,500"
+              disabled={!checked}
+              className="border-none h-12 text-sm font-bold bg-transparent shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none w-full"
             />
-          </Field>
-          <Field label="Price / month" error={monthError}>
-            <Input
-              id={monthId}
-              name={monthName}
-              type="number"
-              inputMode="decimal"
-              step="0.01"
-              min={0}
-              placeholder="0.00"
-              className={cn('bg-muted/50 border-border/50 focus:bg-background', monthError && 'border-destructive')}
-              aria-invalid={!!monthError}
-            />
-          </Field>
-        </div>
-      )}
+            <span className="px-3 font-bold text-[#5c5c55] text-[13px] shrink-0">/ day</span>
+          </div>
+          {dayError && <p className="text-[10px] font-bold text-red-600 mt-1 uppercase">{dayError}</p>}
+        </Field>
+      </div>
     </div>
   )
 }

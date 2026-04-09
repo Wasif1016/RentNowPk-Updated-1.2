@@ -1,27 +1,26 @@
 import Link from 'next/link'
-import { Users, CarFront, Clock, CalendarCheck, UserCheck, AlertCircle } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { 
+  Users, 
+  CarFront, 
+  Clock, 
+  CalendarCheck, 
+  UserCheck, 
+  AlertCircle,
+  Car,
+  ShieldCheck,
+  ArrowRight,
+  Book,
+  Lightbulb
+} from 'lucide-react'
 import { formatDistanceToNow, format } from 'date-fns'
-import { getAdminDashboardStats, getAdminPendingVendors, getAdminRecentBookings } from '@/lib/db/admin-dashboard'
-import { Badge } from '@/components/ui/badge'
+import { 
+  getAdminDashboardStats, 
+  getAdminPendingVendors, 
+  getAdminRecentBookings 
+} from '@/lib/db/admin-dashboard'
 import { Button } from '@/components/ui/button'
-
-function statusBadge(status: string) {
-  const map: Record<string, { label: string; cls: string }> = {
-    PENDING: { label: 'Pending', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
-    CONFIRMED: { label: 'Active', cls: 'bg-green-50 text-green-700 border-green-200' },
-    COMPLETED: { label: 'Completed', cls: 'bg-blue-50 text-blue-700 border-blue-200' },
-    REJECTED: { label: 'Rejected', cls: 'bg-red-50 text-red-700 border-red-200' },
-    CANCELLED: { label: 'Cancelled', cls: 'bg-gray-50 text-gray-600 border-gray-200' },
-    PENDING_VERIFICATION: { label: 'Pending', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
-    APPROVED: { label: 'Approved', cls: 'bg-green-50 text-green-700 border-green-200' },
-  }
-  const s = map[status] ?? { label: status, cls: 'bg-gray-50 text-gray-600 border-gray-200' }
-  return (
-    <Badge variant="secondary" className={`border ${s.cls} font-medium`}>
-      {s.label}
-    </Badge>
-  )
-}
+import { IndustrialCard } from '@/components/dashboard/industrial-card'
 
 export default async function AdminDashboardPage() {
   const [stats, pendingVendors, recentBookings] = await Promise.all([
@@ -31,167 +30,170 @@ export default async function AdminDashboardPage() {
   ])
 
   return (
-    <div className="px-6 pt-8 pb-10 lg:px-8">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Admin Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Platform overview and moderation queue.</p>
-        </div>
-      </div>
-
-      {/* Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <StatCard
-          label="Total Users"
-          value={String(stats.totalUsers)}
-          subtitle={`${stats.totalVendors} vendors`}
-          icon={Users}
-          iconBg="bg-primary/10"
-          iconColor="text-primary"
-        />
-        <StatCard
-          label="Pending Verifications"
-          value={String(stats.pendingVerifications)}
-          subtitle={stats.pendingVerifications > 0 ? 'Needs review' : 'All clear'}
-          icon={UserCheck}
-          iconBg="bg-amber-50"
-          iconColor="text-amber-600"
-        />
-        <StatCard
-          label="Active Bookings"
-          value={String(stats.activeBookings)}
-          subtitle={`${stats.totalBookings} total`}
-          icon={CalendarCheck}
-          iconBg="bg-emerald-50"
-          iconColor="text-emerald-600"
-        />
-        <StatCard
-          label="Total Vehicles"
-          value={String(stats.totalVehicles)}
-          subtitle="Listed across all vendors"
-          icon={CarFront}
-          iconBg="bg-indigo-50"
-          iconColor="text-indigo-600"
-        />
-      </div>
-
-      {/* Pending Vendors + Recent Bookings */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        {/* Recent Bookings */}
-        <div className="lg:col-span-2 rounded-xl bg-card border border-border shadow-sm">
-          <div className="px-6 py-5 border-b border-border">
-            <h3 className="font-semibold text-foreground">Recent Bookings</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">Latest booking activity across the platform</p>
+    <div className="space-y-10 animate-in fade-in duration-500 font-sans pb-16">
+      
+      {/* Platform Banner */}
+      <div className="bg-[#f0f3ff] border-2 border-primary p-6 flex flex-col md:flex-row justify-between items-center gap-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
+        <div className="flex items-center gap-5">
+          <div className="h-14 w-14 bg-primary border-2 border-primary flex items-center justify-center shadow-[4px_4px_0px_0px_#feae2c] shrink-0">
+             <ShieldCheck className="text-[#feae2c] size-6" />
           </div>
-          {recentBookings.length === 0 ? (
-            <div className="px-6 py-10 text-center">
-              <p className="text-muted-foreground text-sm">No bookings yet.</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-border">
-              {recentBookings.map((b) => (
-                <div key={b.bookingId} className="px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 hover:bg-muted/30 transition-colors">
-                  <div className="min-w-0">
-                    <p className="font-medium text-foreground truncate">{b.vehicleName}</p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {b.customerName} &middot; {b.vendorBusinessName}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span className="text-xs text-muted-foreground hidden sm:inline">
-                      {formatDistanceToNow(b.createdAt, { addSuffix: true })}
-                    </span>
-                    {statusBadge(b.status)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <div>
+            <p className="font-bold text-primary uppercase tracking-tight text-[20px] mb-1">Platform Operations</p>
+            <p className="text-muted-foreground font-bold uppercase tracking-widest text-[10px]">Active monitoring and moderation queue.</p>
+          </div>
         </div>
-
-        {/* Pending Vendors */}
-        <div className="rounded-xl bg-card border border-border shadow-sm p-5">
-          <h3 className="font-semibold text-foreground flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 text-primary" />
-            Vendor Verification Queue
-          </h3>
-          {pendingVendors.length === 0 ? (
-            <p className="text-sm text-muted-foreground mt-4">No pending verifications.</p>
-          ) : (
-            <div className="mt-4 space-y-4">
-              {pendingVendors.map((v) => (
-                <div key={v.vendorId} className="flex justify-between items-start border-b border-border pb-3 last:border-0 last:pb-0">
-                  <div className="min-w-0">
-                    <p className="font-medium text-foreground text-sm truncate">{v.businessName || v.publicSlug}</p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {v.submittedAt ? formatDistanceToNow(v.submittedAt, { addSuffix: true }) : 'No date'}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {statusBadge(v.status)}
-                    <Link
-                      href="/admin/vendors"
-                      className="text-primary text-xs font-medium hover:underline"
-                    >
-                      Review
-                    </Link>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-          <Button asChild variant="outline" size="sm" className="w-full mt-5 text-sm rounded-lg">
-            <Link href="/admin/vendors">View all vendors &rarr;</Link>
+        <div className="flex gap-4">
+          <Button asChild variant="outline" className="px-6 py-6 h-auto text-xs font-bold uppercase border-2 border-primary shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] bg-white text-primary rounded-none">
+            <Link href="/admin/vendors">All Vendors</Link>
+          </Button>
+          <Button asChild className="px-6 py-6 h-auto text-xs font-bold uppercase border-2 border-primary shadow-[4px_4px_0px_0px_#feae2c] bg-primary text-white rounded-none">
+            <Link href="/admin/bookings">All Bookings</Link>
           </Button>
         </div>
       </div>
 
-      {/* Admin Tip */}
-      <div className="rounded-2xl bg-accent/50 border border-accent p-5 flex flex-wrap justify-between items-center gap-4">
-        <div className="flex items-center gap-4">
-          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-            <Clock className="h-5 w-5 text-primary" />
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="bg-white border-2 border-primary p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+          <p className="text-[20px] font-bold text-primary uppercase tracking-tight mb-3">Total Users</p>
+          <div className="text-[48px] font-bold text-primary leading-none">{stats.totalUsers}</div>
+        </div>
+
+        <div className="bg-white border-2 border-primary p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+          <p className="text-[20px] font-bold text-primary uppercase tracking-tight mb-3">Verifications</p>
+          <div className="text-[48px] font-bold text-primary leading-none">{stats.pendingVerifications}</div>
+        </div>
+
+        <div className="bg-white border-2 border-primary p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+          <p className="text-[20px] font-bold text-primary uppercase tracking-tight mb-3">Active Trips</p>
+          <div className="text-[48px] font-bold text-primary leading-none">{stats.activeBookings}</div>
+        </div>
+
+        <div className="bg-white border-2 border-primary p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+          <p className="text-[20px] font-bold text-primary uppercase tracking-tight mb-3">Inventory</p>
+          <div className="text-[48px] font-bold text-primary leading-none">{stats.totalVehicles}</div>
+        </div>
+      </div>
+
+      {/* Activity Sections */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* Recent Bookings */}
+        <IndustrialCard 
+          title="Recent Bookings" 
+          icon={<Book className="size-5" />}
+          className="lg:col-span-8"
+          contentClassName="p-0"
+        >
+          {recentBookings.length === 0 ? (
+             <div className="flex flex-col items-center justify-center py-20 text-center">
+                <Clock className="text-muted-foreground size-12 mb-4 opacity-10" />
+                <p className="text-sm font-bold uppercase text-muted-foreground tracking-widest">No platform activity.</p>
+             </div>
+          ) : (
+            <div className="divide-y-2 divide-muted">
+              {recentBookings.map((b) => (
+                <div key={b.bookingId} className="flex items-center hover:bg-black/[0.02] transition-colors group">
+                  <div className="w-24 h-24 border-r-2 border-primary flex items-center justify-center bg-muted shrink-0">
+                    <Car className="size-8 text-primary opacity-30" />
+                  </div>
+                  <div className="flex-1 p-5 flex justify-between items-center min-w-0">
+                    <div className="min-w-0 pr-4">
+                      <div className="text-base font-bold uppercase tracking-tight truncate mb-1">
+                        {b.vehicleName}
+                      </div>
+                      <div className="text-xs font-bold text-muted-foreground uppercase opacity-70">
+                         {b.customerName} • {b.vendorBusinessName}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0 ml-5">
+                      <div className={cn(
+                        "inline-block px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider rounded-none mb-2 border-2",
+                        ['CONFIRMED', 'COMPLETED', 'ACTIVE'].includes(b.status) 
+                          ? "bg-green-600 text-white border-green-700" 
+                          : "bg-[#feae2c] text-primary border-[#d48c1f]"
+                      )}>
+                        {b.status}
+                      </div>
+                      <div className="text-2xl font-bold text-primary uppercase tabular-nums tracking-tight">
+                        {formatDistanceToNow(new Date(b.createdAt), { addSuffix: true })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="px-5 py-4 border-t-2 border-primary bg-black/[0.02]">
+            <Link 
+              href="/admin/bookings" 
+              className="text-primary font-bold uppercase text-sm flex items-center gap-2 hover:translate-x-1 transition-transform"
+            >
+              View Full History <ArrowRight className="size-4" />
+            </Link>
+          </div>
+        </IndustrialCard>
+
+        {/* Verification Queue */}
+        <IndustrialCard 
+          title="Queue" 
+          icon={<AlertCircle className="size-5" />}
+          className="lg:col-span-4"
+          contentClassName="p-0"
+        >
+          {pendingVendors.length === 0 ? (
+             <div className="flex flex-col items-center justify-center py-14 text-center px-6">
+                <UserCheck className="text-primary size-12 mb-5 opacity-10" />
+                <p className="font-bold uppercase text-muted-foreground tracking-wider text-xs leading-relaxed">
+                  Verification queue is clear.<br/>All vendors approved.
+                </p>
+             </div>
+          ) : (
+            <div className="divide-y-2 divide-muted">
+              {pendingVendors.map((v) => (
+                <div key={v.vendorId} className="p-5 flex justify-between items-center bg-white hover:bg-black/[0.02] transition-colors">
+                  <div className="min-w-0">
+                    <p className="font-bold text-primary uppercase text-sm truncate">{v.businessName || v.publicSlug}</p>
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase opacity-70">
+                      {v.submittedAt ? formatDistanceToNow(new Date(v.submittedAt), { addSuffix: true }) : 'Pending'}
+                    </p>
+                  </div>
+                  <Link
+                    href="/admin/vendors"
+                    className="text-primary text-[10px] font-bold uppercase border-2 border-primary px-3 py-1 bg-[#feae2c] shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-y-0.5 active:shadow-none transition-all"
+                  >
+                    Review
+                  </Link>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="p-5">
+            <Button asChild variant="outline" className="w-full justify-center bg-transparent text-primary border-2 border-primary shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:bg-primary hover:text-white transition-all font-bold uppercase text-sm rounded-none h-auto py-3">
+              <Link href="/admin/vendors">All Vendors</Link>
+            </Button>
+          </div>
+        </IndustrialCard>
+      </div>
+
+      {/* Footer / Moderation Protocol */}
+      <div className="bg-primary border-2 border-primary p-8 shadow-[6px_6px_0px_0px_#feae2c] flex flex-col lg:flex-row justify-between items-center gap-8 rounded-none">
+        <div className="flex gap-6 items-start">
+          <div className="bg-[#feae2c] p-4 border-2 border-white transform -rotate-3 shadow-[4px_4px_0px_0px_rgba(255,255,255,0.2)] shrink-0">
+            <Lightbulb className="size-7 text-primary" />
           </div>
           <div>
-            <h4 className="font-semibold text-foreground">Quick moderation tip</h4>
-            <p className="text-sm text-muted-foreground">Review vendor verifications promptly to keep the marketplace healthy.</p>
+            <h4 className="font-bold uppercase text-[20px] text-[#feae2c] mb-2 tracking-tight">
+              Moderation Protocol
+            </h4>
+            <p className="font-normal text-base text-white/70 max-w-md leading-relaxed">
+              Verify vendor documents within the standard 24-hour SLA. Consistent review times directly impact platform liquidity and trust.
+            </p>
           </div>
         </div>
-        <Button asChild variant="outline" size="sm" className="rounded-full text-sm font-medium">
-          <Link href="/admin/vendors">Review vendors &rarr;</Link>
+        <Button asChild className="bg-white text-primary hover:bg-white/90 px-10 py-4 h-auto text-base font-bold uppercase rounded-none border-2 border-white shadow-[4px_4px_0px_0px_rgba(255,255,255,0.5)] active:translate-y-1">
+          <Link href="/admin/vendors">Review Vendors →</Link>
         </Button>
-      </div>
-    </div>
-  )
-}
-
-function StatCard({
-  label,
-  value,
-  subtitle,
-  icon: Icon,
-  iconBg,
-  iconColor,
-}: {
-  label: string
-  value: string
-  subtitle: string
-  icon: React.ComponentType<{ className?: string }>
-  iconBg: string
-  iconColor: string
-}) {
-  return (
-    <div className="rounded-xl bg-card border border-border shadow-sm p-5 transition-shadow hover:shadow-md">
-      <div className="flex justify-between items-start">
-        <div>
-          <p className="text-sm font-medium text-muted-foreground">{label}</p>
-          <p className="text-2xl font-bold text-foreground mt-1 tabular-nums">{value}</p>
-          <span className="text-xs text-muted-foreground mt-2 inline-block">{subtitle}</span>
-        </div>
-        <div className={`h-10 w-10 rounded-xl ${iconBg} flex items-center justify-center ${iconColor}`}>
-          <Icon className="h-5 w-5" />
-        </div>
       </div>
     </div>
   )

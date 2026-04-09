@@ -1,183 +1,174 @@
 import Link from 'next/link'
-import { CalendarCheck, Clock, CheckCircle, Search, CarFront } from 'lucide-react'
-import { formatDistanceToNow, format } from 'date-fns'
+import { cn } from '@/lib/utils'
+import { format } from 'date-fns'
+import { 
+  Search, 
+  Globe, 
+  Car, 
+  Clock, 
+  ShieldCheck, 
+  History, 
+  MapPin, 
+  ArrowRight, 
+  Compass,
+  CalendarOff,
+  Lightbulb
+} from 'lucide-react'
 import { getRequiredUser } from '@/lib/auth/session'
 import {
   getCustomerDashboardStats,
   getCustomerRecentBookings,
   getCustomerUpcomingBookings,
 } from '@/lib/db/customer-dashboard'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
-
-
-import { DashboardStatCard } from '@/components/dashboard/dashboard-stat-card'
-import { DashboardStatusBadge } from '@/components/dashboard/dashboard-status-badge'
+import { IndustrialCard } from '@/components/dashboard/industrial-card'
 
 export default async function CustomerDashboardPage() {
   const user = await getRequiredUser('CUSTOMER')
 
-  const [stats, upcoming, recent] = await Promise.all([
+  const [stats, recent, upcoming] = await Promise.all([
     getCustomerDashboardStats(user.id),
-    getCustomerUpcomingBookings(user.id, 3),
     getCustomerRecentBookings(user.id, 5),
+    getCustomerUpcomingBookings(user.id, 3),
   ])
 
   return (
-    <div className="px-6 pt-10 pb-16 lg:px-12">
-      {/* ─── Premium Header ─── */}
-      <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-8 mb-12 border-b-4 border-[#0B1B3D] pb-10 relative">
-         <div className="absolute -bottom-1 left-0 w-24 h-1.5 bg-[#F5A623]" />
-         
-         <div>
-            <div className="flex items-center gap-3 mb-4">
-               <div className="h-2 w-10 bg-[#F5A623]" />
-               <h2 className="text-[11px] font-black uppercase tracking-[0.4em] text-[#0B1B3D]/40 leading-none mt-0.5">Member Portal</h2>
-            </div>
-            <h1 className="text-5xl font-black tracking-tighter text-[#0B1B3D] uppercase leading-none">
-               Customer<span className="text-[#F5A623] italic">Hub</span>
-            </h1>
-            <p className="text-[12px] font-bold text-[#0B1B3D]/50 uppercase tracking-tight mt-4 max-w-xl leading-relaxed">
-               Welcome back, <span className="text-[#0B1B3D]">{user.fullName.split(' ')[0]}</span>. You have <span className="text-[#F5A623] underline decoration-2 underline-offset-4">{stats.activeBookings} active trips</span> and {stats.pendingBookings} awaiting responses.
-            </p>
-         </div>
-
-         <Button asChild className="bg-[#0B1B3D] text-white border-2 border-[#0B1B3D] rounded-sm text-[11px] font-black uppercase tracking-widest shadow-[4px_4px_0_#F5A623] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all h-12 px-8 shrink-0">
-           <Link href="/search">
-             <Search className="h-4 w-4 mr-2 text-[#F5A623]" strokeWidth={3} />
-             Start New Search
-           </Link>
-         </Button>
-      </div>
-
-      {/* ─── Summary Metrics ─── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
-        <DashboardStatCard
-          label="Total Trips"
-          value={String(stats.totalBookings)}
-          subtitle={`${stats.completedBookings} Successfully finished`}
-          icon={CalendarCheck}
-        />
-        <DashboardStatCard
-          label="Active Rentals"
-          value={String(stats.activeBookings)}
-          subtitle={stats.activeBookings > 0 ? 'On the road' : 'Ready to travel?'}
-          icon={CarFront}
-          className={stats.activeBookings > 0 ? "border-[#F5A623]" : ""}
-        />
-        <DashboardStatCard
-          label="Pending Requests"
-          value={String(stats.pendingBookings)}
-          subtitle="Awaiting vendor reply"
-          icon={Clock}
-        />
-        <DashboardStatCard
-          label="Completed"
-          value={String(stats.completedBookings)}
-          subtitle="Trip history"
-          icon={CheckCircle}
-        />
-      </div>
-
-      {/* ─── Main Content Area ─── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-        
-        {/* Recent Bookings Display */}
-        <div className="lg:col-span-2 bg-white border-4 border-[#0B1B3D] rounded-sm shadow-[8px_8px_0_#0B1B3D/5] overflow-hidden">
-          <div className="bg-[#0B1B3D] px-6 py-5 flex items-center justify-between">
-            <div>
-               <h3 className="text-xs font-black text-white uppercase tracking-widest mb-1">Rental Timeline</h3>
-               <p className="text-[9px] font-bold text-white/40 uppercase tracking-tighter">Your recent trip activity and history</p>
-            </div>
-            <Link href="/customer/bookings" className="text-[10px] font-black uppercase text-[#F5A623] underline underline-offset-4 decoration-2">Full History</Link>
+    <div className="space-y-10 animate-in fade-in duration-500 font-sans pb-16">
+      
+      {/* Search Prompt Banner */}
+      <div className="bg-[#f0f3ff] border-2 border-primary p-6 flex flex-col md:flex-row justify-between items-center gap-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
+        <div className="flex items-center gap-5">
+          <div className="h-14 w-14 bg-primary border-2 border-primary flex items-center justify-center shadow-[4px_4px_0px_0px_#feae2c] shrink-0">
+             <Search className="text-[#feae2c] size-6" />
           </div>
-          
+          <div>
+            <p className="font-bold text-primary uppercase tracking-tight text-[20px] mb-1">Ready for your next journey?</p>
+            <p className="text-muted-foreground font-bold uppercase tracking-widest text-[10px]">Find verified vehicles available across Pakistan.</p>
+          </div>
+        </div>
+        <Button asChild className="w-full md:w-auto px-8 py-6 h-auto text-sm font-bold uppercase border-2 border-primary shadow-[4px_4px_0px_0px_#feae2c] bg-primary text-white rounded-none">
+          <Link href="/search">Locate Vehicle</Link>
+        </Button>
+      </div>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="bg-white border-2 border-primary p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+          <p className="text-[20px] font-bold text-primary uppercase tracking-tight mb-3">Journeys</p>
+          <div className="text-[48px] font-bold text-primary leading-none">{stats.totalBookings}</div>
+        </div>
+
+        <div className="bg-white border-2 border-primary p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+          <p className="text-[20px] font-bold text-primary uppercase tracking-tight mb-3">In Transit</p>
+          <div className="text-[48px] font-bold text-primary leading-none">{stats.activeBookings}</div>
+        </div>
+
+        <div className="bg-white border-2 border-primary p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+          <p className="text-[20px] font-bold text-primary uppercase tracking-tight mb-3">Awaiting</p>
+          <div className="text-[48px] font-bold text-primary leading-none">{stats.pendingBookings}</div>
+        </div>
+
+        <div className="bg-white border-2 border-primary p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+          <p className="text-[20px] font-bold text-primary uppercase tracking-tight mb-3">Verified</p>
+          <div className="text-[48px] font-bold text-primary leading-none">{stats.completedBookings}</div>
+        </div>
+      </div>
+
+      {/* Activity Sections */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* Rental Timeline */}
+        <IndustrialCard 
+          title="Recent Activity" 
+          icon={<History className="size-5" />}
+          className="lg:col-span-8"
+          contentClassName="p-0"
+        >
           {recent.length === 0 ? (
-            <div className="px-6 py-20 text-center">
-              <Search className="h-10 w-10 text-[#0B1B3D]/10 mx-auto mb-4" />
-              <p className="text-[#0B1B3D]/30 font-black uppercase tracking-widest text-xs italic">No bookings found in your history.</p>
-              <Button asChild variant="outline" className="mt-6 border-2 border-[#0B1B3D] rounded-sm text-[10px] font-black uppercase py-0 h-10 px-6">
-                <Link href="/search">Browse Vehicles</Link>
-              </Button>
-            </div>
+             <div className="flex flex-col items-center justify-center py-20 text-center">
+                <CalendarOff className="text-muted-foreground size-12 mb-4 opacity-10" />
+                <p className="text-sm font-bold uppercase text-muted-foreground tracking-widest">No transaction history.</p>
+             </div>
           ) : (
-            <div className="divide-y-2 divide-[#0B1B3D]/5">
+            <div className="divide-y-2 divide-muted">
               {recent.map((b) => (
-                <div key={b.bookingId} className="px-6 py-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 hover:bg-gray-50 transition-colors group">
-                  <div className="flex items-center gap-5">
-                    <div className="h-12 w-12 bg-[#F5A623]/10 border-2 border-[#0B1B3D] rounded-sm flex items-center justify-center shrink-0 shadow-[2px_2px_0_#0B1B3D]">
-                       <CarFront className="h-6 w-6 text-[#0B1B3D]" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-black text-[#0B1B3D] uppercase text-sm tracking-tighter leading-none mb-1 group-hover:text-[#F5A623] transition-colors">{b.vehicleName}</p>
-                      <p className="text-[10px] font-bold text-[#0B1B3D]/40 uppercase tracking-tight">
-                        {b.vendorBusinessName} &middot; {format(b.pickupAt, 'MMM d')} – {format(b.dropoffAt, 'MMM d, yyyy')}
-                      </p>
-                    </div>
+                <div key={b.bookingId} className="flex items-center hover:bg-black/[0.02] transition-colors group">
+                  <div className="w-24 h-24 border-r-2 border-primary flex items-center justify-center bg-muted shrink-0">
+                    <MapPin className="size-8 text-primary opacity-30" />
                   </div>
-                  <div className="flex items-center gap-6 shrink-0">
-                    <DashboardStatusBadge status={b.status} />
-                    <Link
-                      href={`/customer/chat/${b.bookingId}`}
-                      className="bg-[#0B1B3D] text-white px-5 py-2 rounded-sm text-[10px] font-black uppercase tracking-widest shadow-[3px_3px_0_#F5A623] hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none transition-all"
-                    >
-                      Messages
-                    </Link>
+                  <div className="flex-1 p-5 flex justify-between items-center min-w-0">
+                    <div className="min-w-0 pr-4">
+                      <div className="text-base font-bold uppercase tracking-tight truncate mb-1">
+                        {b.vehicleName}
+                      </div>
+                      <div className="text-xs font-bold text-muted-foreground uppercase opacity-70">
+                        {b.vendorBusinessName} • {format(b.pickupAt, 'MMM d, yyyy')}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0 ml-5">
+                      <div className={cn(
+                        "inline-block px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider rounded-none mb-2 border-2",
+                        ['CONFIRMED', 'COMPLETED', 'ACTIVE'].includes(b.status) 
+                          ? "bg-green-600 text-white border-green-700" 
+                          : "bg-[#feae2c] text-primary border-[#d48c1f]"
+                      )}>
+                        {b.status}
+                      </div>
+                      <div className="text-2xl font-bold text-primary uppercase tabular-nums tracking-tight">
+                        {format(b.pickupAt, 'h:mm a')}
+                      </div>
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
           )}
-        </div>
+          <div className="px-5 py-4 border-t-2 border-primary bg-black/[0.02]">
+            <Link 
+              href="/customer/bookings" 
+              className="text-primary font-bold uppercase text-sm flex items-center gap-2 hover:translate-x-1 transition-transform"
+            >
+              View History <ArrowRight className="size-4" />
+            </Link>
+          </div>
+        </IndustrialCard>
 
-        {/* Sidebar: Highlights */}
-        <aside className="space-y-8">
-           <div className="bg-white border-4 border-[#0B1B3D] p-6 rounded-sm shadow-[8px_8px_0_#F5A623/20]">
-              <div className="flex items-center gap-3 mb-6">
-                 <Clock className="h-5 w-5 text-[#F5A623]" strokeWidth={3} />
-                 <h3 className="text-xs font-black text-[#0B1B3D] uppercase tracking-widest leading-none mt-1">Next Expeditions</h3>
-              </div>
-              
-              {upcoming.length === 0 ? (
-                <p className="text-[10px] font-bold text-[#0B1B3D]/30 uppercase italic">No trips planned yet.</p>
-              ) : (
-                <div className="space-y-6">
-                  {upcoming.map((b) => (
-                    <div key={b.bookingId} className="flex flex-col gap-2 border-b-2 border-gray-100 pb-4 last:border-0 last:pb-0">
-                      <div className="flex justify-between items-start gap-2">
-                        <p className="font-black text-[#0B1B3D] text-[12px] uppercase tracking-tighter truncate leading-tight">{b.vehicleName}</p>
-                        <DashboardStatusBadge status={b.status} className="scale-75 origin-right translate-x-1" />
-                      </div>
-                      <p className="text-[10px] font-bold text-[#0B1B3D]/50 uppercase tracking-tight leading-none mb-1">
-                        {formatDistanceToNow(b.pickupAt, { addSuffix: true })}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
-              
-              <Button asChild variant="outline" className="w-full mt-6 border-2 border-[#0B1B3D] rounded-sm text-[9px] font-black uppercase tracking-[0.2em] shadow-[3px_3px_0_#0F1E32]">
-                <Link href="/customer/bookings">View All Trips</Link>
-              </Button>
-           </div>
-
-           {/* Branded Info Card */}
-           <div className="bg-[#0B1B3D] p-6 rounded-sm text-white border-2 border-[#0B1B3D] shadow-[8px_8px_0_#F5A623]">
-             <div className="flex items-center gap-4 mb-4">
-                <div className="h-10 w-10 bg-[#F5A623] border-2 border-white rounded-sm flex items-center justify-center -rotate-3 shadow-lg">
-                   <Clock className="h-5 w-5 text-[#0B1B3D]" />
-                </div>
-                <h4 className="text-[11px] font-black uppercase text-[#F5A623] tracking-widest leading-tight italic">Travel Pro-Tip</h4>
-             </div>
-             <p className="text-[10px] font-bold text-white/70 leading-relaxed uppercase tracking-tight">
-                Plan your weekend escapes early! Vehicles in popular cities book out <span className="text-[#F5A623]">80% faster</span> during holiday seasons.
+        {/* Navigation / Compass */}
+        <IndustrialCard 
+          title="Compass" 
+          icon={<Compass className="size-5" />}
+          className="lg:col-span-4"
+        >
+          <div className="flex flex-col items-center justify-center py-14 text-center">
+             <Compass className="text-primary size-12 mb-5 opacity-10" />
+             <p className="font-bold uppercase text-muted-foreground tracking-wider text-xs leading-relaxed">
+               Route optimization active.<br/>No active dispatches.
              </p>
-           </div>
-        </aside>
+          </div>
+          <Button asChild variant="outline" className="w-full mt-6 justify-center bg-transparent text-primary border-2 border-primary shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:bg-primary hover:text-white transition-all font-bold uppercase text-sm rounded-none h-auto py-3">
+            <Link href="/search">Browse Map</Link>
+          </Button>
+        </IndustrialCard>
+      </div>
 
+      {/* Footer / Safety Section */}
+      <div className="bg-primary border-2 border-primary p-8 shadow-[6px_6px_0px_0px_#feae2c] flex flex-col lg:flex-row justify-between items-center gap-8 rounded-none">
+        <div className="flex gap-6 items-start">
+          <div className="bg-[#feae2c] p-4 border-2 border-white transform -rotate-3 shadow-[4px_4px_0px_0px_rgba(255,255,255,0.2)] shrink-0">
+            <ShieldCheck className="size-7 text-primary" />
+          </div>
+          <div>
+            <h4 className="font-bold uppercase text-[20px] text-[#feae2c] mb-2 tracking-tight">
+              Safety Protocol
+            </h4>
+            <p className="font-normal text-base text-white/70 max-w-md leading-relaxed">
+              Verified partners consistently achieve higher success rates. Prioritize listings with the shield badge for maximum reliability.
+            </p>
+          </div>
+        </div>
+        <Button asChild className="bg-white text-primary hover:bg-white/90 px-10 py-4 h-auto text-base font-bold uppercase rounded-none border-2 border-white shadow-[4px_4px_0px_0px_rgba(255,255,255,0.5)] active:translate-y-1">
+          <Link href="/customer/settings">Safety Standards →</Link>
+        </Button>
       </div>
     </div>
   )
 }
-

@@ -33,9 +33,14 @@ export default async function CustomerChatThreadPage({
         currentUserId={user.id}
         title={ctx.vehicleName}
         subtitle={`${ctx.otherPartyName} · ${ctx.status.replace(/_/g, ' ')}`}
-        layout="embedded"
+        layout="standalone"
+        backHref="/customer/chat"
         bookingStatus={ctx.status}
         isVendor={false}
+        pickupAt={ctx.pickupAt}
+        dropoffAt={ctx.dropoffAt}
+        pickupAddress={ctx.pickupAddress}
+        vehicleCoverUrl={ctx.vehicleCoverUrl}
       />
     </BookingChatShell>
   )

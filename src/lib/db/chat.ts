@@ -17,6 +17,7 @@ import {
   messages,
   users,
   vehicles,
+  vehicleImages,
 } from '@/lib/db/schema'
 import { getUnreadCountsByThreadId, getTotalUnreadForUser } from '@/lib/db/chat-unread'
 
@@ -109,6 +110,10 @@ export type BookingChatContext = {
   isCustomer: boolean
   customerUserId: string
   vendorUserId: string
+  pickupAt: Date
+  dropoffAt: Date
+  pickupAddress: string
+  vehicleCoverUrl: string | null
 }
 
 const bookingCustomer = alias(users, 'booking_customer')
@@ -129,6 +134,10 @@ export async function getChatContextForBooking(options: {
       vendorUserId: bookings.vendorUserId,
       customerName: bookingCustomer.fullName,
       vendorName: bookingVendor.fullName,
+      pickupAt: bookings.pickupAt,
+      dropoffAt: bookings.dropoffAt,
+      pickupAddress: bookings.pickupAddress,
+      vehicleCoverUrl: sql<string>`(SELECT url FROM ${vehicleImages} WHERE ${vehicleImages.vehicleId} = ${vehicles.id} AND ${vehicleImages.isCover} = true LIMIT 1)`,
     })
     .from(bookings)
     .innerJoin(chatThreads, eq(chatThreads.bookingId, bookings.id))
@@ -158,6 +167,10 @@ export async function getChatContextForBooking(options: {
     isCustomer,
     customerUserId: row.customerUserId,
     vendorUserId: row.vendorUserId,
+    pickupAt: row.pickupAt,
+    dropoffAt: row.dropoffAt,
+    pickupAddress: row.pickupAddress,
+    vehicleCoverUrl: row.vehicleCoverUrl,
   }
 }
 

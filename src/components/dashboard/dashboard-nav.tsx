@@ -1,46 +1,42 @@
-import type { ComponentProps } from "react"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  Add01Icon,
-  Calendar03Icon,
-  Car01Icon,
-  Chat01Icon,
-  DashboardSquare01Icon,
-  Settings01Icon,
-  User02Icon,
-  UserGroupIcon,
-} from "@hugeicons/core-free-icons"
-
-type Hugeicon = NonNullable<ComponentProps<typeof HugeiconsIcon>["icon"]>
+import { 
+  LayoutDashboard, 
+  Car, 
+  PlusSquare, 
+  Calendar, 
+  MessageSquare, 
+  Settings, 
+  Users,
+  LucideIcon 
+} from "lucide-react"
 
 export type DashboardNavItem = {
   href: string
   label: string
-  icon: Hugeicon
+  iconName: string
 }
 
 export const VENDOR_NAV: DashboardNavItem[] = [
-  { href: "/vendor", label: "Dashboard", icon: DashboardSquare01Icon },
-  { href: "/vendor/vehicles", label: "Vehicles", icon: Car01Icon },
-  { href: "/vendor/vehicles/add", label: "Add vehicle", icon: Add01Icon },
-  { href: "/vendor/bookings", label: "Bookings", icon: Calendar03Icon },
-  { href: "/vendor/chat", label: "Messages", icon: Chat01Icon },
-  { href: "/vendor/profile", label: "Settings", icon: Settings01Icon },
+  { href: "/vendor", label: "Dashboard", iconName: "layout-dashboard" },
+  { href: "/vendor/vehicles", label: "Vehicles", iconName: "car" },
+  { href: "/vendor/vehicles/add", label: "Add vehicle", iconName: "plus-square" },
+  { href: "/vendor/bookings", label: "Bookings", iconName: "calendar" },
+  { href: "/vendor/chat", label: "Messages", iconName: "message-square" },
+  { href: "/vendor/settings", label: "Settings", iconName: "settings" },
 ]
 
 export const CUSTOMER_NAV: DashboardNavItem[] = [
-  { href: "/customer", label: "Dashboard", icon: DashboardSquare01Icon },
-  { href: "/customer/bookings", label: "Bookings", icon: Calendar03Icon },
-  { href: "/customer/chat", label: "Messages", icon: Chat01Icon },
-  { href: "/customer/settings", label: "Settings", icon: Settings01Icon },
+  { href: "/customer", label: "Dashboard", iconName: "layout-dashboard" },
+  { href: "/customer/bookings", label: "Bookings", iconName: "calendar" },
+  { href: "/customer/chat", label: "Messages", iconName: "message-square" },
+  { href: "/customer/settings", label: "Settings", iconName: "settings" },
 ]
 
 export const ADMIN_NAV: DashboardNavItem[] = [
-  { href: "/admin", label: "Dashboard", icon: DashboardSquare01Icon },
-  { href: "/admin/vendors", label: "Vendors", icon: UserGroupIcon },
-  { href: "/admin/bookings", label: "Bookings", icon: Calendar03Icon },
-  { href: "/admin/chat", label: "Messages", icon: Chat01Icon },
-  { href: "/admin/settings", label: "Settings", icon: Settings01Icon },
+  { href: "/admin", label: "Dashboard", iconName: "layout-dashboard" },
+  { href: "/admin/vendors", label: "Vendors", iconName: "users" },
+  { href: "/admin/bookings", label: "Bookings", iconName: "calendar" },
+  { href: "/admin/chat", label: "Messages", iconName: "message-square" },
+  { href: "/admin/settings", label: "Settings", iconName: "settings" },
 ]
 
 export function isDashboardNavActive(pathname: string, href: string): boolean {

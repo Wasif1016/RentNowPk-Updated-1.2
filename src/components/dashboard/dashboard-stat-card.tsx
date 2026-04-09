@@ -18,26 +18,20 @@ export function DashboardStatCard({
 }: DashboardStatCardProps) {
   return (
     <div className={cn(
-      "bg-white border-2 border-[#0B1B3D] p-5 rounded-md shadow-[4px_4px_0_#0F1E32] transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_#0F1E32]",
+      "bg-white border-2 border-[#000615] p-5 shadow-[4px_4px_0px_0px_#000615] flex flex-col transition-all duration-200 hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none rounded-none",
       className
     )}>
-      <div className="flex justify-between items-start">
-        <div className="flex-1 min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.15em] text-[#0B1B3D]/50 mb-1 leading-none">
-            {label}
-          </p>
-          <p className="text-3xl font-black text-[#0B1B3D] tracking-tighter tabular-nums leading-none mb-2">
-            {value}
-          </p>
-          {subtitle && (
-            <p className="text-[10px] font-bold text-[#0B1B3D]/40 uppercase tracking-tight leading-none">
-              {subtitle}
-            </p>
-          )}
+      <div className="flex items-center justify-between mb-3 text-[10px] font-bold text-[#000615]/40 uppercase tracking-widest leading-none">
+        <p>{label}</p>
+        <div className="h-8 w-8 border-2 border-[#000615] flex items-center justify-center text-[#0B1F3A] bg-[#feae2c] shadow-[1px_1px_0px_0px_#000] rounded-none">
+          <Icon className="h-4 w-4" strokeWidth={3} />
         </div>
-        <div className="bg-[#F5A623] border-2 border-[#0B1B3D] p-2 rounded-sm shadow-[2px_2px_0_#0B1B3D] shrink-0">
-          <Icon className="h-5 w-5 text-[#0B1B3D]" strokeWidth={3} />
-        </div>
+      </div>
+      <div className="flex flex-col">
+        <p className="text-3xl font-bold text-[#000615] tracking-tighter leading-none mb-1.5 uppercase">{value}</p>
+        {subtitle && (
+          <p className="text-[9px] font-normal text-[#000615]/60 uppercase tracking-widest leading-none">{subtitle}</p>
+        )}
       </div>
     </div>
   )

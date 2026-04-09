@@ -7,25 +7,17 @@ export default function VendorAddVehiclePage() {
     ''
 
   return (
-    <div className="px-6 pt-10 pb-16 lg:px-12">
-      {/* ─── Branded Header ─── */}
-      <div className="mb-12 border-b-4 border-[#0B1B3D] pb-10 relative">
-         <div className="absolute -bottom-1 left-0 w-24 h-1.5 bg-[#F5A623]" />
-         
-         <div className="flex items-center gap-3 mb-4">
-            <div className="h-2 w-10 bg-[#F5A623]" />
-            <h2 className="text-[11px] font-black uppercase tracking-[0.4em] text-[#0B1B3D]/40 leading-none mt-0.5">Asset Initialization</h2>
-         </div>
-         <h1 className="text-5xl font-black tracking-tighter text-[#0B1B3D] uppercase leading-none mb-4">
-            Add New<span className="text-[#F5A623] italic">Vehicle</span>
-         </h1>
-         <p className="text-[12px] font-bold text-[#0B1B3D]/50 uppercase tracking-tight max-w-2xl leading-relaxed">
-            Configure your asset parameters, define pricing structures, and upload high-fidelity imagery to attract premium rental requests.
-         </p>
-      </div>
+    <div className="max-w-[900px] mx-auto space-y-12 pb-20 font-sans animate-in fade-in duration-500">
+      {/* Page Header */}
+      <header className="page-header">
+        <h1 className="text-[72px] font-black text-[#000615] tracking-tighter leading-[0.95] mb-4">New asset</h1>
+        <p className="text-base font-bold text-[#000615]/60 tracking-tight">
+          Register your vehicle in the <strong className="text-[#000615]">RentNowPk fleet registry</strong>
+        </p>
+      </header>
 
-      {/* Form Section */}
-      <div className="max-w-4xl">
+      {/* Form Card Container */}
+      <div className="bg-white border-2 border-primary p-6 md:p-10 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
          <AddVehicleForm logoDevPublishableKey={logoDevPublishableKey} />
       </div>
     </div>

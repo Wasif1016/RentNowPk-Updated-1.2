@@ -188,33 +188,33 @@ export function VehiclePickupMap({ fieldError, className }: VehiclePickupMapProp
   const err = configError ?? mapError ?? fieldError
 
   return (
-    <div className={cn('space-y-3', className)}>
+    <div className={cn('space-y-3 font-sans', className)} style={{ fontFamily: 'Arial, sans-serif' }}>
       <input type="hidden" name="pickupLatitude" value={pickup.lat} readOnly />
       <input type="hidden" name="pickupLongitude" value={pickup.lng} readOnly />
       <input type="hidden" name="pickupPlaceId" value={pickup.placeId} readOnly />
       <input type="hidden" name="pickupFormattedAddress" value={pickup.formattedAddress} readOnly />
 
       <Field data-invalid={!!err}>
-        <FieldLabel>Pickup location</FieldLabel>
-        <FieldDescription>
-          Choose how to set the pin. We derive the listing city from this location (Pakistan only).
-        </FieldDescription>
+        <label className="text-[13px] font-bold text-primary tracking-wide mb-2 block">Pickup location</label>
+        <p className="text-[11px] font-normal text-[#5c5c55] tracking-tight mb-4">
+          Choose how to set the pin. We derive the listing city from this location.
+        </p>
 
         <Tabs
           value={mode}
           onValueChange={(v) => setMode(v as 'search' | 'map')}
           className="mt-3 w-full gap-3"
         >
-          <TabsList variant="line" className="w-full justify-start">
-            <TabsTrigger value="search" className="flex-1 sm:flex-none">
+          <TabsList className="w-full justify-start bg-transparent h-auto p-0 border-b-2 border-muted rounded-none">
+            <TabsTrigger value="search" className="flex-1 sm:flex-none py-3 px-6 text-sm font-bold data-[state=active]:bg-primary data-[state=active]:text-white rounded-none border-t-2 border-x-2 border-transparent data-[state=active]:border-primary transition-all">
               Search address
             </TabsTrigger>
-            <TabsTrigger value="map" className="flex-1 sm:flex-none">
+            <TabsTrigger value="map" className="flex-1 sm:flex-none py-3 px-6 text-sm font-bold data-[state=active]:bg-primary data-[state=active]:text-white rounded-none border-t-2 border-x-2 border-transparent data-[state=active]:border-primary transition-all">
               Pin on map
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="search" className="mt-3 space-y-2 outline-none">
+          <TabsContent value="search" className="mt-6 space-y-3 outline-none">
             <input
               id="pickup-search"
               ref={searchInputRef}
@@ -223,33 +223,32 @@ export function VehiclePickupMap({ fieldError, className }: VehiclePickupMapProp
               placeholder="e.g. Model Town, Lahore"
               disabled={!!configError}
               className={cn(
-                'border-input bg-input/30 text-foreground placeholder:text-muted-foreground',
-                'focus-visible:border-ring focus-visible:ring-ring/50 h-10 w-full min-w-0 rounded-xl border px-3 py-2 text-base transition-colors outline-none focus-visible:ring-[3px] md:text-sm',
-                'bg-card border-border'
+                'bg-white h-14 w-full text-base border-2 border-[#d4d4c8] px-4 py-2 font-bold focus:border-primary transition-all rounded-none outline-none',
+                err && 'border-red-600'
               )}
             />
             {pickup.formattedAddress ? (
-              <p className="text-muted-foreground text-xs leading-relaxed">
-                Selected: {pickup.formattedAddress}
+              <p className="text-[11px] font-bold text-primary leading-relaxed bg-muted/30 p-3 border-l-4 border-primary">
+                Resolved: {pickup.formattedAddress}
               </p>
             ) : (
-              <p className="text-muted-foreground text-xs">Pick a suggestion from the list.</p>
+              <p className="text-[11px] font-bold text-[#5c5c55] uppercase tracking-widest">Pick a suggestion from the list.</p>
             )}
           </TabsContent>
 
-          <TabsContent value="map" className="mt-3 outline-none">
+          <TabsContent value="map" className="mt-6 outline-none">
             <div
               ref={setMapContainerRef}
-              className="border-border bg-muted h-72 min-h-72 w-full rounded-xl border md:h-96"
+              className="border-2 border-primary bg-muted h-72 min-h-72 w-full rounded-none md:h-96 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
               role="presentation"
             />
-            <p className="text-muted-foreground mt-2 text-xs">
-              Drag the pin to the exact pickup spot. Address will be resolved when you save.
+            <p className="text-[11px] font-bold text-[#5c5c55] mt-4 uppercase tracking-widest">
+              Drag the pin to the exact pickup spot.
             </p>
           </TabsContent>
         </Tabs>
 
-        {err ? <FieldError>{err}</FieldError> : null}
+        {err ? <p className="text-[11px] font-bold text-red-600 mt-2 uppercase tracking-widest">{err}</p> : null}
       </Field>
     </div>
   )

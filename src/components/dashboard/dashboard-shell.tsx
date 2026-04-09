@@ -3,13 +3,14 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect, useRef } from 'react'
-import { HugeiconsIcon } from '@hugeicons/react'
-import { Menu, X, ChevronDown, CheckCircle } from 'lucide-react'
+import { 
+  Menu, X, Bell, HelpCircle, Search, LogOut,
+  LayoutDashboard, Car, PlusSquare, Calendar, MessageSquare, Settings, Users,
+  LucideIcon
+} from 'lucide-react'
 
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
-import { formatUnreadBadge } from '@/lib/format/unread'
+import { logoutAction } from '@/lib/actions/auth'
 import { type DashboardNavItem, isDashboardNavActive } from './dashboard-nav'
 
 export type DashboardShellUser = {
@@ -28,12 +29,30 @@ export type DashboardShellProps = {
   children: React.ReactNode
 }
 
+const DASHBOARD_ICONS: Record<string, LucideIcon> = {
+  'layout-dashboard': LayoutDashboard,
+  'car': Car,
+  'plus-square': PlusSquare,
+  'calendar': Calendar,
+  'message-square': MessageSquare,
+  'settings': Settings,
+  'users': Users,
+}
+
+function DashboardIcon({ name, className }: { name: string; className?: string }) {
+  const Icon = DASHBOARD_ICONS[name] || HelpCircle
+  return <Icon className={className} />
+}
+
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean)
   if (parts.length === 0) return '?'
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }
+
+// Map HugeIcons/Lucide to Material symbols names if possible, but the user's reference uses hardcoded symbols.
+// For now, I'll use the icons from navItems if they are components, or hardcode common ones for the shell logic.
 
 export function DashboardShell({
   navItems,
@@ -46,185 +65,132 @@ export function DashboardShell({
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const sidebarRef = useRef<HTMLElement>(null)
 
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setSidebarOpen(false)
-    }
-    window.addEventListener('keydown', handleKey)
-    return () => window.removeEventListener('keydown', handleKey)
-  }, [])
+  const handleLogout = async () => {
+    await logoutAction()
+  }
 
-  useEffect(() => {
-    if (!sidebarOpen) return
-    const handleClick = (e: MouseEvent) => {
-      if (
-        sidebarRef.current &&
-        !sidebarRef.current.contains(e.target as Node)
-      ) {
-        setSidebarOpen(false)
-      }
-    }
-    const timer = setTimeout(() => {
-      document.addEventListener('mousedown', handleClick)
-    }, 0)
-    return () => {
-      clearTimeout(timer)
-      document.removeEventListener('mousedown', handleClick)
-    }
-  }, [sidebarOpen])
-
-  useEffect(() => {
-    if (typeof document === 'undefined') return
-    document.body.style.overflow = sidebarOpen ? 'hidden' : ''
-    return () => {
-      document.body.style.overflow = ''
-    }
-  }, [sidebarOpen])
+  // Generate a simple title based on pathname if not provided by children (hypothetically)
+  const pageTitle = navItems.find(item => isDashboardNavActive(pathname, item.href))?.label || 'Dashboard'
 
   return (
-    <div className="flex min-h-screen bg-gray-50/50">
-      {/* Mobile menu button */}
-      <button
-        type="button"
-        onClick={() => setSidebarOpen(true)}
-        className="fixed left-4 top-4 z-50 rounded-md bg-[#0B1B3D] border-2 border-[#F5A623] p-2 text-[#F5A623] shadow-[4px_4px_0_#0F1E32] lg:hidden"
-        aria-label="Open menu"
-      >
-        <Menu className="h-5 w-5" strokeWidth={3} />
-      </button>
-
-      {/* Overlay */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-[#0B1B3D]/80 backdrop-blur-sm lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-          aria-hidden
-        />
-      )}
-
-      {/* Sidebar */}
-      <aside
-        ref={sidebarRef}
-        className={cn(
-          'fixed top-0 left-0 z-50 h-screen w-72 bg-[#0B1B3D] border-r-4 border-[#F5A623] flex flex-col shadow-[10px_0_30px_rgba(0,0,0,0.5)] transition-transform duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] lg:sticky lg:z-auto lg:translate-x-0',
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        )}
-      >
-        {/* Mobile close button */}
-        <button
-          type="button"
-          onClick={() => setSidebarOpen(false)}
-          className="absolute top-4 right-4 rounded-md p-1.5 text-[#F5A623] hover:bg-white/10 lg:hidden"
-          aria-label="Close menu"
-        >
-          <X className="h-6 w-6" strokeWidth={3} />
-        </button>
-
-        {/* Logo Section */}
-        <div className="relative px-6 py-10 border-b-2 border-white/5 overflow-hidden">
-          {/* Branded Pinstripe Background */}
-          <div className="absolute inset-0 opacity-[0.03] pointer-events-none" 
-               style={{ backgroundImage: 'repeating-linear-gradient(45deg, #F5A623, #F5A623 1px, transparent 1px, transparent 10px)' }} />
-          
-          <Link href="/" className="relative z-10 flex items-center gap-2 group">
-            <span className="text-2xl font-black tracking-tighter text-white uppercase italic">
-              RentNow<span className="text-[#F5A623] not-italic">Pk</span>
-            </span>
+    <div className="flex flex-col min-h-[100dvh] bg-[#f9f9ff] text-[#071c36] font-sans">
+      
+      {/* Top Navigation Bar */}
+      <header className="fixed top-0 right-0 left-0 z-50 flex justify-between items-center px-6 py-4 w-full bg-[#0B1F3A] border-b-4 border-[#000615] shadow-[4px_4px_0px_0px_rgba(0,6,21,1)]">
+        <div className="flex items-center gap-4">
+          <Link href="/" className="text-2xl font-bold text-[#F5A623] italic tracking-tighter uppercase">
+            RentNowPk
           </Link>
-          <p className="relative z-10 text-[10px] font-black uppercase tracking-[0.3em] text-[#F5A623] mt-2 leading-none">
-            Member Portal
-          </p>
         </div>
-
-        {/* Navigation */}
-        <nav className="flex-1 px-4 py-8 space-y-2 overflow-y-auto custom-scrollbar">
-          {navItems.map((item) => {
-            const active = isDashboardNavActive(pathname, item.href)
-            const unread = navUnreadCounts?.[item.href] ?? 0
-            const unreadLabel = formatUnreadBadge(unread)
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                prefetch
-                onClick={() => setSidebarOpen(false)}
-                className={cn(
-                  'group flex items-center gap-3 px-4 py-3.5 rounded-sm text-[11px] font-black uppercase tracking-wider transition-all border-2 border-transparent',
-                  active
-                    ? 'bg-[#F5A623] text-[#0B1B3D] border-[#0B1B3D] shadow-[4px_4px_0_rgba(245,166,35,0.3)]'
-                    : 'text-white/60 hover:text-white hover:bg-white/5'
-                )}
-              >
-                <div className={cn(
-                  "p-1.5 rounded-sm transition-colors shrink-0",
-                  active ? "bg-[#0B1B3D]" : "group-hover:bg-white/10"
-                )}>
-                  <HugeiconsIcon
-                    icon={item.icon}
-                    strokeWidth={3}
-                    className={cn(
-                      'h-4 w-4',
-                      active ? 'text-[#F5A623]' : 'text-inherit opacity-70 group-hover:opacity-100'
-                    )}
-                  />
-                </div>
-                <span className="flex-1 truncate">{item.label}</span>
-                {unreadLabel ? (
-                  <span className={cn(
-                    "ml-auto shrink-0 font-black tabular-nums text-[9px] px-2 py-0.5 rounded-full border shadow-sm",
-                    active ? "bg-[#0B1B3D] text-[#F5A623] border-[#F5A623]/20" : "bg-[#F5A623] text-[#0B1B3D] border-[#0B1B3D]"
-                  )}>
-                    {unreadLabel}
-                  </span>
-                ) : null}
-              </Link>
-            )
-          })}
-        </nav>
-
-        {/* User profile section */}
-        <div className="p-6 border-t-2 border-white/5 bg-black/10">
-          <div className="flex items-center gap-4 group">
-            <div className="relative shrink-0">
-               <Avatar className="h-10 w-10 border-2 border-[#F5A623] rounded-sm bg-[#0B1B3D]">
-                 {user.avatarUrl ? (
-                   <AvatarImage src={user.avatarUrl} alt="" className="object-cover" />
-                 ) : null}
-                 <AvatarFallback className="text-xs font-black text-[#F5A623] bg-transparent">
-                   {initials(sidebarUserName)}
-                 </AvatarFallback>
-               </Avatar>
-               {user.verificationStatus === 'APPROVED' && (
-                  <div className="absolute -top-1 -right-1 bg-[#F5A623] p-0.5 rounded-full border border-[#0B1B3D]">
-                     <CheckCircle className="h-2.5 w-2.5 text-[#0B1B3D]" strokeWidth={4} />
-                  </div>
-               )}
-            </div>
-            
-            <div className="flex-1 min-w-0">
-              <p className="text-[11px] font-black uppercase text-white tracking-widest truncate">
-                {sidebarUserName}
-              </p>
-              <p className="text-[9px] font-bold text-white/40 truncate mt-0.5 tracking-tight uppercase">
-                {user.email}
-              </p>
+        <div className="flex items-center gap-6">
+          <div className="relative hidden md:block">
+            <input 
+              className="bg-[#000615] text-white border-2 border-[#F5A623] px-4 py-2 w-64 text-sm focus:outline-none focus:shadow-[4px_4px_0px_0px_#F5A623] rounded-none" 
+              placeholder="Search..." 
+              type="text"
+            />
+          </div>
+          <div className="flex items-center gap-4">
+            <button className="md:hidden text-[#F5A623] p-2 border-2 border-[#F5A623] bg-[#000615] active:translate-y-0.5 transition-all" onClick={() => setSidebarOpen(!sidebarOpen)}>
+               {sidebarOpen ? <X className="size-6" /> : <Menu className="size-6" />}
+            </button>
+            <div className="hidden md:flex items-center gap-4">
+              <button className="text-[#F5A623] hover:bg-[#000615] p-2 transition-all active:translate-y-1">
+                <Bell className="size-5" />
+              </button>
+              <button className="text-[#F5A623] hover:bg-[#000615] p-2 transition-all active:translate-y-1">
+                <HelpCircle className="size-5" />
+              </button>
             </div>
           </div>
+        </div>
+      </header>
 
-          {user.verificationStatus === 'APPROVED' && (
-            <div className="mt-4 flex items-center justify-center gap-2 bg-[#F5A623]/10 border border-[#F5A623]/20 text-[#F5A623] text-[9px] font-black uppercase tracking-widest py-1.5 rounded-sm">
-               VERIFIED VENDOR
-            </div>
+      <div className="flex flex-1 pt-20">
+        {/* SideNavBar - Thick Right Border */}
+        <aside
+          ref={sidebarRef}
+          className={cn(
+            'fixed left-0 top-0 h-full z-40 flex flex-col pt-20 w-64 bg-white border-r-4 border-primary transition-transform duration-300 md:sticky md:top-20 md:h-[calc(100vh-5rem)] md:translate-x-0 md:pt-0',
+            sidebarOpen ? 'translate-x-0 shadow-[8px_0px_0px_0px_rgba(0,6,21,1)]' : '-translate-x-full'
           )}
-        </div>
-      </aside>
+        >
+          <div className="p-6 mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 border-2 border-primary shrink-0 bg-[#0B1F3A] flex items-center justify-center text-[#F5A623] font-bold text-xl rounded-none shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                 {initials(sidebarUserName)}
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-primary uppercase tracking-tight leading-none mb-1 truncate w-32">{sidebarUserName}</h2>
+                <span className="text-[10px] font-bold text-muted-foreground uppercase">Verified User</span>
+              </div>
+            </div>
+          </div>
+          
+          <nav className="flex-1 px-4 space-y-4 overflow-y-auto">
+            {navItems.map((item) => {
+              const active = isDashboardNavActive(pathname, item.href)
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setSidebarOpen(false)}
+                  className={cn(
+                    "flex items-center gap-3 font-bold uppercase tracking-tight px-4 py-3 border-2 transition-all rounded-none",
+                    active 
+                      ? "bg-[#feae2c] text-primary border-primary shadow-[4px_4px_0px_0px_rgba(0,6,21,1)] mx-0 my-1 active:shadow-none active:translate-x-1 active:translate-y-1" 
+                      : "text-primary border-transparent hover:bg-muted hover:border-primary/20 hover:translate-x-1"
+                  )}
+                >
+                  <DashboardIcon name={item.iconName} className="size-5" />
+                  <span>{item.label}</span>
+                </Link>
+              )
+            })}
+          </nav>
 
-      {/* Main content */}
-      <main className="flex-1 min-w-0 bg-gray-50/30">
-        <div className="max-w-[1600px] mx-auto min-h-screen flex flex-col">
-          {children}
-        </div>
-      </main>
+          <div className="mt-auto p-4 space-y-4 border-t-2 border-primary bg-muted/30">
+            <button 
+              onClick={handleLogout}
+              className="w-full bg-[#feae2c] text-primary font-bold py-3 border-2 border-primary shadow-[4px_4px_0px_0px_#000] hover:translate-y-[-2px] hover:shadow-[6px_6px_0px_0px_#000] active:translate-y-0 transition-all uppercase text-sm rounded-none"
+            >
+              Sign Out
+            </button>
+          </div>
+        </aside>
+
+        <main className="flex-1 min-w-0">
+          <div className="p-6 md:p-8 space-y-8">
+            {children}
+          </div>
+        </main>
+      </div>
+
+      {/* Bottom Nav on Mobile if needed, but the drawer is preferred for high contrast */}
+      {/* (Keeping existing mobile bottom nav for convenience but restyling it) */}
+      <nav className="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 py-3 pb-safe bg-white border-t-4 border-primary shadow-[0px_-4px_0px_0px_rgba(0,6,21,1)]">
+        {navItems.slice(0, 4).map((item) => {
+          const active = isDashboardNavActive(pathname, item.href)
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "flex flex-col items-center justify-center p-2 mx-1 transition-all duration-100 rounded-none border-2",
+                active 
+                  ? "bg-[#feae2c] text-primary border-primary shadow-[4px_4px_0px_0px_rgba(0,6,21,1)] scale-95" 
+                  : "text-primary border-transparent"
+              )}
+            >
+              <DashboardIcon name={item.iconName} className="size-5" />
+              <span className="text-[9px] font-bold uppercase mt-1 tracking-tighter">{item.label}</span>
+            </Link>
+          )
+        })}
+      </nav>
+
+      {/* Background Texture */}
+      <div className="fixed inset-0 -z-10 pointer-events-none opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '24px 24px' }}></div>
     </div>
   )
 }
